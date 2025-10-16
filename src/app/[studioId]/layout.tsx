@@ -2,7 +2,7 @@ import { StudioFooter } from "@/components/layout/StudioFooter";
 import { StudioHeader } from "@/components/layout/StudioHeader";
 
 // This layout now receives "params" which contains the studioId from the URL
-export default function StudioLayout({
+export default async function StudioLayout({
   children,
   params,
 }: {
