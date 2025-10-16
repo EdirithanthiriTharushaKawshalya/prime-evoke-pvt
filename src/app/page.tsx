@@ -18,8 +18,8 @@ export default function HomePage() {
             Capturing Moments, Crafting Sound.
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            The professional hub for Prime Evoke's creative ventures in photography,
-            visual storytelling, and music production.
+            The professional hub for Prime Evoke&apos;s creative ventures in
+            photography, visual storytelling, and music production.
           </p>
         </div>
       </section>
@@ -27,12 +27,13 @@ export default function HomePage() {
       {/* Sub-Brands Gateway Section */}
       <section className="container mx-auto pb-20 md:pb-32">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          
           {/* Evoke Gallery Card */}
           <Card className="flex flex-col">
             <CardHeader className="flex-1">
               <CardTitle className="text-2xl">Evoke Gallery</CardTitle>
-              <CardDescription>Professional Photography Services</CardDescription>
+              <CardDescription>
+                Professional Photography Services
+              </CardDescription>
             </CardHeader>
             <CardFooter>
               <Button asChild className="w-full">
@@ -66,7 +67,6 @@ export default function HomePage() {
               </Button>
             </CardFooter>
           </Card>
-          
         </div>
       </section>
     </div>

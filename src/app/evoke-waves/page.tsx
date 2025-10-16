@@ -9,8 +9,8 @@ export default function EvokeWavesPage() {
           Evoke Waves
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
-          Professional music production and sound design. We craft unique soundscapes
-          that bring your creative vision to life.
+          Professional music production and sound design. We craft unique
+          soundscapes that bring your creative vision to life.
         </p>
       </section>
 
@@ -43,7 +43,7 @@ export default function EvokeWavesPage() {
       <section className="mt-16 md:mt-24 text-center bg-secondary py-16 rounded-lg">
         <h2 className="text-3xl font-bold mb-4">Have a project in mind?</h2>
         <p className="text-muted-foreground mb-8">
-          Let's talk about how we can collaborate.
+          Let&apos;s talk about how we can collaborate.
         </p>
         <Button size="lg" asChild>
           <a href="mailto:contact@primeevoke.com">Get in Touch</a>

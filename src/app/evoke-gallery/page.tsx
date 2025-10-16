@@ -31,7 +31,7 @@ export default function EvokeGalleryHome() {
           <div className="bg-secondary h-64 md:h-80 rounded-md"></div>
         </div>
         <Button variant="outline" asChild>
-            <Link href="/evoke-gallery/portfolio">Explore Full Portfolio</Link>
+          <Link href="/evoke-gallery/portfolio">Explore Full Portfolio</Link>
         </Button>
       </section>
 
@@ -39,7 +39,8 @@ export default function EvokeGalleryHome() {
       <section className="bg-secondary py-16 md:py-24">
         <div className="container mx-auto text-center max-w-3xl">
           <blockquote className="text-xl md:text-2xl italic">
-            "The photos were breathtaking. They perfectly captured the emotion of our special day. We couldn't be happier!"
+            The photos were breathtaking. They perfectly captured the emotion of
+            our special day. We couldn&apos;t be happier!
           </blockquote>
           <p className="mt-4 text-muted-foreground">- Sarah & Tom</p>
         </div>
