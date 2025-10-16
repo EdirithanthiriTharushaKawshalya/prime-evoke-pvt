@@ -54,6 +54,29 @@
   animation: moveBlob2 25s infinite alternate ease-in-out;
 }
 
+/* --- Mobile Styles for a More Dynamic Aurora Effect --- */
+/* This code block only applies to screens 768px wide or smaller */
+@media (max-width: 768px) {
+  .blob {
+    /* We reduce the blur significantly on mobile to make the color core more visible */
+    filter: blur(100px);
+
+    /* We increase the opacity to make the colors pop more against the dark background */
+    opacity: 0.45;
+  }
+
+  /* We also make the blobs smaller so their movement across the small screen is much more apparent */
+  .blob-1 {
+    width: 400px;
+    height: 400px;
+  }
+
+  .blob-2 {
+    width: 300px;
+    height: 300px;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
