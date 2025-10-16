@@ -12,7 +12,6 @@
   z-index: -1;
 }
 
-/* More complex keyframes for a fluid, non-repeating motion */
 @keyframes moveBlob1 {
   0% { transform: scale(1) translate(0, 0); }
   33% { transform: scale(1.2) translate(30vw, -10vh); }
@@ -30,29 +29,29 @@
 .blob {
   position: absolute;
   border-radius: 50%;
-  /* Increased blur and reduced opacity for subtlety */
-  filter: blur(150px);
-  opacity: 0.25;
+  /* Make the blur less intense and the color more visible */
+  filter: blur(120px);
+  opacity: 0.4;
 }
 
-/* First blob: a larger, vibrant blue */
 .blob-1 {
   width: 700px;
   height: 700px;
   top: -200px;
   left: -200px;
-  background-color: #2563eb; /* Tailwind blue-600 */
-  animation: moveBlob1 25s infinite alternate ease-in-out;
+  background-color: #2563eb;
+  /* Make the animation slightly faster */
+  animation: moveBlob1 20s infinite alternate ease-in-out;
 }
 
-/* Second blob: a different shade of blue, different size and speed */
 .blob-2 {
   width: 500px;
   height: 500px;
   bottom: -150px;
   right: -150px;
-  background-color: #4f46e5; /* Tailwind indigo-600 */
-  animation: moveBlob2 30s infinite alternate ease-in-out;
+  background-color: #4f46e5;
+  /* Make the animation slightly faster */
+  animation: moveBlob2 25s infinite alternate ease-in-out;
 }
 
 @custom-variant dark (&:is(.dark *));
