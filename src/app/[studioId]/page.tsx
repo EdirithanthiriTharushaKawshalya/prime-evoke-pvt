@@ -63,8 +63,8 @@ export default async function StudioHomePage({
       <section className="bg-secondary py-16 md:py-24">
         <div className="container mx-auto text-center max-w-3xl">
           <blockquote className="text-xl md:text-2xl italic">
-            "The photos were breathtaking. They perfectly captured the emotion
-            of our special day. We couldn&apos;t be happier!"
+            &quot;The photos were breathtaking. They perfectly captured the emotion
+            of our special day. We couldn&apos;t be happier!&quot;
           </blockquote>
           <p className="mt-4 text-muted-foreground">- Sarah & Tom</p>
         </div>
