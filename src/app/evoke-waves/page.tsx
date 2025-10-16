@@ -1,8 +1,10 @@
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Button } from "@/components/ui/button";
 
 export default function EvokeWavesPage() {
   return (
     <div className="container mx-auto py-12 md:py-24 px-6">
+      <AnimatedBackground /> 
       {/* Hero Section */}
       <section className="text-center">
         <h1 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4">

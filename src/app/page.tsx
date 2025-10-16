@@ -1,5 +1,6 @@
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,6 +15,7 @@ export default function HomePage() {
   return (
     
     <div>
+      <AnimatedBackground /> 
       <Header />
       {/* Hero Section */}
       <section className="text-center py-20 md:py-32">
