@@ -11,14 +11,29 @@ import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { Check } from "lucide-react";
 
+// STEP 1: Define the shape of our data with a TypeScript type.
+// This tells our code exactly what a "package" looks like.
+type ServicePackage = {
+  id: number;
+  created_at: string;
+  name: string | null;
+  price: string | null;
+  description: string | null;
+  features: string[] | null; // Specifically, an array of strings
+  studio_name: string | null;
+};
+
 export default async function ServicesPage() {
   
-  // Fetch data, but ONLY for Evoke Gallery
-  const { data: packages, error } = await supabase
+  // Fetch data from Supabase
+  const { data, error } = await supabase
     .from('services')
     .select('*')
-    .eq('studio_name', 'Evoke Gallery') // <-- THIS IS THE NEW LINE
+    .eq('studio_name', 'Evoke Gallery')
     .order('id'); 
+
+  // STEP 2: Apply our new type to the data we fetched.
+  const packages: ServicePackage[] | null = data;
 
   if (error) {
     console.error("Error fetching services:", error);
@@ -39,6 +54,7 @@ export default async function ServicesPage() {
 
       {/* Packages Section */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Now TypeScript knows what 'pkg' is, and the error on 'feature' is gone! */}
         {packages?.map((pkg) => (
           <Card key={pkg.id} className="flex flex-col">
             <CardHeader>
