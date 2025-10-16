@@ -1,3 +1,4 @@
+import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,7 +11,9 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
+    
     <div>
+      <Header />
       {/* Hero Section */}
       <section className="text-center py-20 md:py-32">
         <div className="container mx-auto">

@@ -23,16 +23,25 @@ type ServicePackage = {
   studio_name: string | null;
 };
 
-export default async function ServicesPage() {
-  
-  // Fetch data from Supabase
-  const { data, error } = await supabase
-    .from('services')
-    .select('*')
-    .eq('studio_name', 'Evoke Gallery')
-    .order('id'); 
+// The page now receives "params" from the layout
+export default async function ServicesPage({
+  params,
+}: {
+  params: { studioId: string };
+}) {
+  const studioName = params.studioId
+    .replace(/-/g, " ")
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 
-  // STEP 2: Apply our new type to the data we fetched.
+  // The query now uses the dynamic studioName to fetch the correct data!
+  const { data, error } = await supabase
+    .from("services")
+    .select("*")
+    .eq("studio_name", studioName) // Use the dynamic name here
+    .order("id");
+
   const packages: ServicePackage[] | null = data;
 
   if (error) {
