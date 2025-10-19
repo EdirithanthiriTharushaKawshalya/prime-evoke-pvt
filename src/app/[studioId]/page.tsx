@@ -1,26 +1,24 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { getStudioData } from "@/lib/data";
-import { Studio } from "@/lib/types"; // Import the Studio type
-import Image from "next/image"; // Import Next/Image
+import { Studio } from "@/lib/types";
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 
 export default async function StudioHomePage({
   params,
 }: {
-  params: { studioId: string };
+  params: Promise<{ studioId: string }>; // 1. Type params as a Promise
 }) {
-  // Fetch all our dynamic data
-  const studioData: Studio = await getStudioData(params.studioId);
+  const { studioId } = await params; // 2. Await the params right at the top
 
-  // Get the public URL for the hero image
-  // IMPORTANT: You must create a Supabase Storage bucket named 'studio-images'
-  // and upload your images to 'evoke-gallery/hero-image.jpg' and 'studio-zine/hero-image.jpg'
-  
-  let heroImageUrl = "/placeholder.jpg"; // A default placeholder
+  // 3. Now, use the unwrapped 'studioId' variable everywhere
+  const studioData: Studio = await getStudioData(studioId);
+
+  let heroImageUrl = "/placeholder.jpg";
   if (studioData.hero_image_url) {
     const { data } = supabase.storage
-      .from("studio-images") 
+      .from("studio-images")
       .getPublicUrl(studioData.hero_image_url);
     if (data) {
       heroImageUrl = data.publicUrl;
@@ -30,9 +28,8 @@ export default async function StudioHomePage({
   return (
     <>
       {/* --- New Hero Section --- */}
-      <section className="container mx-auto py-16 md:py-32 px-4">
+      <section className="container mx-auto py-16 md:py-16 px-4">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 items-center">
-          
           {/* Left Column: Text Content */}
           <div className="md:col-span-3">
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
@@ -45,7 +42,8 @@ export default async function StudioHomePage({
               {studioData.hero_description}
             </p>
             <Button size="lg" asChild>
-              <Link href={`/${params.studioId}/book`}>Book Now</Link>
+              {/* 3. Use the unwrapped 'studioId' variable */}
+              <Link href={`/${studioId}/book`}>Book Now</Link>
             </Button>
 
             <hr className="my-12 opacity-30" />
@@ -86,10 +84,11 @@ export default async function StudioHomePage({
           <div className="bg-secondary h-64 md:h-80 rounded-md"></div>
         </div>
         <Button variant="outline" asChild>
-            <Link href={`/${params.studioId}/portfolio`}>Explore Full Portfolio</Link>
+          {/* 3. Use the unwrapped 'studioId' variable */}
+          <Link href={`/${studioId}/portfolio`}>Explore Full Portfolio</Link>
         </Button>
       </section>
-      
+
       {/* --- Testimonial Section (Unchanged) --- */}
       <section className="bg-secondary py-16 md:py-24">
         <div className="container mx-auto text-center max-w-3xl">
