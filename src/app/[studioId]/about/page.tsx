@@ -1,13 +1,23 @@
 import { Button } from "@/components/ui/button";
+import { getStudioData } from "@/lib/data"; // 👈 Import the data function
 import Link from "next/link";
 
-export default function AboutPage() {
+// Make the component async and accept params
+export default async function AboutPage({
+  params,
+}: {
+  params: { studioId: string };
+}) {
+  // Fetch the specific data for this studio
+  const studioData = await getStudioData(params.studioId);
+
   return (
     <div className="container mx-auto py-12 md:py-24 px-6">
       {/* Page Header */}
       <section className="text-center mb-12 md:mb-16">
+        {/* Use the dynamic studio name */}
         <h1 className="text-4xl md:text-5xl font-bold tracking-tighter">
-          About Evoke Gallery
+          About {studioData.name}
         </h1>
         <p className="text-lg text-muted-foreground mt-2 max-w-2xl mx-auto">
           The heart and vision behind the lens.
@@ -19,7 +29,7 @@ export default function AboutPage() {
         {/* Photographer Image Placeholder */}
         <div className="md:col-span-2">
           <div className="aspect-square bg-secondary rounded-lg w-full h-auto">
-            {/* Placeholder for a professional headshot */}
+            {/* Placeholder: We'll load studioData.photographer_image_url here later */}
           </div>
         </div>
 
@@ -27,22 +37,8 @@ export default function AboutPage() {
         <div className="md:col-span-3">
           <h2 className="text-3xl font-bold mb-4">Our Story</h2>
           <div className="space-y-4 text-muted-foreground">
-            <p>
-              Welcome to Evoke Gallery, where we believe photography is more than
-              just taking pictures—it&apos;s about telling stories. Founded by
-              [Photographer&apos;s Name], our passion is to capture the genuine emotions and
-              fleeting moments that make your special day unforgettable.
-            </p>
-            <p>
-              With over a decade of experience in wedding and portrait
-              photography, we have honed a style that is both timeless and
-              artistic. We focus on natural light and authentic interactions to
-              create images that you and your family will cherish for generations.
-            </p>
-            <p>
-              Our mission is to provide a seamless and enjoyable experience from
-              our first meeting to the final delivery of your beautiful gallery.
-            </p>
+            {/* Use the dynamic "about_text" from Supabase */}
+            <p>{studioData.about_text}</p>
           </div>
         </div>
       </section>
@@ -55,7 +51,8 @@ export default function AboutPage() {
           your vision.
         </p>
         <Button size="lg" asChild>
-          <Link href="/evoke-gallery/book">Get in Touch</Link>
+          {/* Make the link dynamic */}
+          <Link href={`/${params.studioId}/book`}>Get in Touch</Link>
         </Button>
       </section>
     </div>
