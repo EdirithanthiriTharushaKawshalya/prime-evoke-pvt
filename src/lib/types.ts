@@ -17,6 +17,7 @@ export type Studio = {
   hero_description: string | null; // New
   hero_image_url: string | null; // New
   stats: Stat[] | null; // New
+  facebook_url: string | null;
 };
 
 // This is the shape of your ServicePackage data

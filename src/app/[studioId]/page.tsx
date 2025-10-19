@@ -4,15 +4,15 @@ import { getStudioData } from "@/lib/data";
 import { Studio } from "@/lib/types";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import { ArrowRight } from "lucide-react";
+import { Facebook } from "lucide-react";
 
 export default async function StudioHomePage({
   params,
 }: {
-  params: Promise<{ studioId: string }>; // 1. Type params as a Promise
+  params: Promise<{ studioId: string }>;
 }) {
-  const { studioId } = await params; // 2. Await the params right at the top
-
-  // 3. Now, use the unwrapped 'studioId' variable everywhere
+  const { studioId } = await params;
   const studioData: Studio = await getStudioData(studioId);
 
   let heroImageUrl = "/placeholder.jpg";
@@ -29,6 +29,7 @@ export default async function StudioHomePage({
     <>
       {/* --- New Hero Section --- */}
       <section className="container mx-auto py-16 md:py-16 px-4">
+        {/* ... (Your hero section code remains unchanged) ... */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 items-center">
           {/* Left Column: Text Content */}
           <div className="md:col-span-3">
@@ -42,7 +43,6 @@ export default async function StudioHomePage({
               {studioData.hero_description}
             </p>
             <Button size="lg" asChild>
-              {/* 3. Use the unwrapped 'studioId' variable */}
               <Link href={`/${studioId}/book`}>Book Now</Link>
             </Button>
 
@@ -54,7 +54,9 @@ export default async function StudioHomePage({
                 {studioData.stats.map((stat) => (
                   <div key={stat.label}>
                     <p className="text-4xl font-bold">{stat.value}</p>
-                    <p className="text-sm text-muted-foreground">{stat.label}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {stat.label}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -88,17 +90,36 @@ export default async function StudioHomePage({
           <Link href={`/${studioId}/portfolio`}>Explore Full Portfolio</Link>
         </Button>
       </section>
-
-      {/* --- Testimonial Section (Unchanged) --- */}
-      <section className="bg-secondary py-16 md:py-24">
-        <div className="container mx-auto text-center max-w-3xl">
-          <blockquote className="text-xl md:text-2xl italic">
-            &quot;The photos were breathtaking. They perfectly captured the
-            emotion of our special day. We couldn&apos;t be happier!&quot;
-          </blockquote>
-          <p className="mt-4 text-muted-foreground">- Sarah & Tom</p>
-        </div>
-      </section>
+      {/* --- New Call-to-Action Section --- */}
+      {/* We only render this section if a Facebook URL exists in the database */}
+      {studioData.facebook_url && (
+        <section className="container mx-auto px-4 py-16 md:py-24">
+          <div className="bg-secondary py-16 md:py-15 rounded-3xl text-center max-w-5xl mx-auto px-6">
+            <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+              Connect With Us
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tighter mb-6">
+              Join Our Community on Facebook
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-8">
+              Follow our page for the latest updates, behind-the-scenes content,
+              and special offers from {studioData.name}.
+            </p>
+            <Button size="lg" variant="outline" asChild>
+              {/* This link is now DYNAMIC */}
+              <a
+                href={studioData.facebook_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2"
+              >
+                <Facebook className="h-4 w-4" />
+                Follow Us
+              </a>
+            </Button>
+          </div>
+        </section>
+      )}
     </>
   );
 }
