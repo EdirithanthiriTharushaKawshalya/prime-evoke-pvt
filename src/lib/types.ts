@@ -14,9 +14,9 @@ export type Studio = {
   hero_subtitle: string | null; // This is the "eyebrow" text
   about_text: string | null;
   photographer_image_url: string | null;
-  hero_description: string | null; // New
-  hero_image_url: string | null; // New
-  stats: Stat[] | null; // New
+  hero_description: string | null; 
+  hero_image_url: string | null; 
+  stats: Stat[] | null; 
   facebook_url: string | null;
 };
 
@@ -29,6 +29,7 @@ export type ServicePackage = {
   description: string | null;
   features: string[] | null;
   studio_name: string | null;
+  category: string | null;
 };
 
 // Add this new type
