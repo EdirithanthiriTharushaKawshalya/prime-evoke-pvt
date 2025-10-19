@@ -1,4 +1,4 @@
-"use client"; // This component is interactive, so it must be a client component
+"use client"; // This component is interactive
 
 import * as React from "react";
 import {
@@ -8,31 +8,32 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { PortfolioCard } from "./PortfolioCard";
-import { PortfolioItem } from "@/lib/types";
 
-// This component receives the portfolio items as a "prop"
-export function PortfolioCarousel({ items }: { items: PortfolioItem[] }) {
+// This component now accepts an array of already-rendered components
+export function PortfolioCarousel({ items }: { items: React.ReactNode[] }) {
   return (
     <div className="relative w-full">
       <Carousel
         opts={{
           align: "start",
-          loop: true, // Make the carousel loop infinitely
+          loop: true,
         }}
         className="w-full"
       >
         <CarouselContent>
-          {items.map((item) => (
-            <CarouselItem key={item.id} className="md:basis-1/2 lg:basis-1/3">
+          {/* We map over the array of components and render them */}
+          {items.map((cardComponent, index) => ( // 👈 Use 'index' here
+            <CarouselItem 
+              key={index} // 👈 Change key to 'index'
+              className="md:basis-1/2 lg:basis-1/3 flex-shrink-0"
+            >
               <div className="p-1">
-                {/* We are reusing the PortfolioCard component we already built! */}
-                <PortfolioCard item={item} />
+                {/* Render the component that was passed in */}
+                {cardComponent}
               </div>
             </CarouselItem>
           ))}
         </CarouselContent>
-        {/* These are the navigation buttons */}
         <CarouselPrevious className="absolute left-[-20px] top-1/2 -translate-y-1/2 hidden md:inline-flex" />
         <CarouselNext className="absolute right-[-20px] top-1/2 -translate-y-1/2 hidden md:inline-flex" />
       </Carousel>

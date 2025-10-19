@@ -6,13 +6,14 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { Facebook } from "lucide-react";
 import { PortfolioCarousel } from "@/components/ui/PortfolioCarousel";
+import { PortfolioCard } from "@/components/ui/PortfolioCard"; // Import the NON-ASYNC PortfolioCard
 
 export default async function StudioHomePage({
   params,
 }: {
-  params: Promise<{ studioId: string }>;
+  params: Promise<{ studioId: string }>; // Correctly typed params
 }) {
-  const { studioId } = await params;
+  const { studioId } = await params; // Await params at the beginning
 
   // --- Data Fetching ---
 
@@ -39,7 +40,7 @@ export default async function StudioHomePage({
       }
       return {
         ...item,
-        publicImageUrl: publicImageUrl,
+        publicImageUrl: publicImageUrl, // Add the image URL property
       };
     })
   );
@@ -48,7 +49,7 @@ export default async function StudioHomePage({
   let heroImageUrl = "/placeholder.jpg";
   if (studioData.hero_image_url) {
     const { data } = supabase.storage
-      .from("studio-images")
+      .from("studio-images") // Make sure this bucket name is correct!
       .getPublicUrl(studioData.hero_image_url);
     if (data) {
       heroImageUrl = data.publicUrl;
@@ -72,6 +73,7 @@ export default async function StudioHomePage({
               {studioData.hero_description}
             </p>
             <Button size="lg" asChild>
+              {/* Use the unwrapped studioId variable */}
               <Link href={`/${studioId}/book`}>Book Now</Link>
             </Button>
 
@@ -110,11 +112,16 @@ export default async function StudioHomePage({
         <h2 className="text-3xl font-bold mb-8">Our Recent Work</h2>
 
         <div className="px-12">
-          {/* Pass the fully prepared data to the client component */}
-          <PortfolioCarousel items={enrichedWorkItems} />
+          {/* Pass the enriched items, rendering cards on the server */}
+          <PortfolioCarousel
+            items={enrichedWorkItems.map((item) => (
+              <PortfolioCard key={item.id} item={item} />
+            ))}
+          />
         </div>
 
         <Button variant="outline" asChild className="mt-12">
+          {/* Use the unwrapped studioId variable */}
           <Link href={`/${studioId}/portfolio`}>Explore Full Portfolio</Link>
         </Button>
       </section>

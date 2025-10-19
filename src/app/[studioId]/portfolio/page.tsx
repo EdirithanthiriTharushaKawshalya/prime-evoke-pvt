@@ -1,7 +1,8 @@
 import { getStudioData } from "@/lib/data";
 import { getPortfolioItems } from "@/lib/data";
 import { PortfolioItem } from "@/lib/types";
-import { PortfolioCard } from "@/components/ui/PortfolioCard";
+import { PortfolioCard } from "@/components/ui/PortfolioCard"; // Import the NON-ASYNC card
+import { supabase } from "@/lib/supabaseClient"; // Import supabase
 
 // Helper function to group items by category
 function categorizeItems(items: PortfolioItem[]) {
@@ -18,11 +19,34 @@ function categorizeItems(items: PortfolioItem[]) {
 export default async function PortfolioPage({
   params,
 }: {
-  params: { studioId: string };
+  params: Promise<{ studioId: string }>; // 1. Correctly type params as Promise
 }) {
-  const studioData = await getStudioData(params.studioId);
-  const portfolioItems = await getPortfolioItems(params.studioId);
-  const categorizedItems = categorizeItems(portfolioItems);
+  const { studioId } = await params; // 2. Await params at the start
+
+  const studioData = await getStudioData(studioId);
+  const portfolioItems = await getPortfolioItems(studioId);
+
+  // 3. Enrich items with image URLs ON THE SERVER
+  const enrichedItems = await Promise.all(
+    portfolioItems.map(async (item) => {
+      let publicImageUrl = "/placeholder.jpg";
+      if (item.thumbnail_url) {
+        const { data } = supabase.storage
+          .from("portfolio-thumbnails") // Make sure this is your bucket name
+          .getPublicUrl(item.thumbnail_url);
+        if (data) {
+          publicImageUrl = data.publicUrl;
+        }
+      }
+      return {
+        ...item,
+        publicImageUrl: publicImageUrl, // Add the image URL property
+      };
+    })
+  );
+
+  // 4. Categorize the ENRICHED items
+  const categorizedItems = categorizeItems(enrichedItems);
 
   return (
     <div className="container mx-auto py-12 md:py-24 px-6">
@@ -43,6 +67,7 @@ export default async function PortfolioPage({
           <div key={category}>
             <h2 className="text-3xl font-bold mb-6">{category}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {/* 5. Pass the ENRICHED item to the NON-ASYNC card */}
               {items.map((item) => (
                 <PortfolioCard key={item.id} item={item} />
               ))}
