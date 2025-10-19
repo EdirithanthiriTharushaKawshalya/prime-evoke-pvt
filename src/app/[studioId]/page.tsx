@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { getStudioData } from "@/lib/data";
-import { Studio } from "@/lib/types";
+import { getStudioData, getPortfolioItems } from "@/lib/data";
+import { Studio, PortfolioItem } from "@/lib/types";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { ArrowRight } from "lucide-react";
 import { Facebook } from "lucide-react";
+import { PortfolioCarousel } from "@/components/ui/PortfolioCarousel";
 
 export default async function StudioHomePage({
   params,
@@ -13,8 +13,38 @@ export default async function StudioHomePage({
   params: Promise<{ studioId: string }>;
 }) {
   const { studioId } = await params;
+
+  // --- Data Fetching ---
+
+  // 1. Fetch the main studio data
   const studioData: Studio = await getStudioData(studioId);
 
+  // 2. Fetch the 6 most recent portfolio items
+  const recentWorkItems: PortfolioItem[] = (
+    await getPortfolioItems(studioId)
+  ).slice(0, 6);
+
+  // 3. "Enrich" the portfolio items with their public image URLs
+  // This must be done on the server before passing to the client component
+  const enrichedWorkItems = await Promise.all(
+    recentWorkItems.map(async (item) => {
+      let publicImageUrl = "/placeholder.jpg";
+      if (item.thumbnail_url) {
+        const { data } = supabase.storage
+          .from("studio-images") // Make sure this bucket name is correct!
+          .getPublicUrl(item.thumbnail_url);
+        if (data) {
+          publicImageUrl = data.publicUrl;
+        }
+      }
+      return {
+        ...item,
+        publicImageUrl: publicImageUrl,
+      };
+    })
+  );
+
+  // 4. Get the Hero Image URL
   let heroImageUrl = "/placeholder.jpg";
   if (studioData.hero_image_url) {
     const { data } = supabase.storage
@@ -29,7 +59,6 @@ export default async function StudioHomePage({
     <>
       {/* --- New Hero Section --- */}
       <section className="container mx-auto py-16 md:py-16 px-4">
-        {/* ... (Your hero section code remains unchanged) ... */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 items-center">
           {/* Left Column: Text Content */}
           <div className="md:col-span-3">
@@ -76,22 +105,22 @@ export default async function StudioHomePage({
         </div>
       </section>
 
-      {/* --- Portfolio Preview Section (Unchanged) --- */}
+      {/* --- New Portfolio Preview Section --- */}
       <section className="container mx-auto py-16 md:py-24 text-center">
         <h2 className="text-3xl font-bold mb-8">Our Recent Work</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          {/* Placeholder images */}
-          <div className="bg-secondary h-64 md:h-80 rounded-md"></div>
-          <div className="bg-secondary h-64 md:h-80 rounded-md"></div>
-          <div className="bg-secondary h-64 md:h-80 rounded-md"></div>
+
+        <div className="px-12">
+          {/* Pass the fully prepared data to the client component */}
+          <PortfolioCarousel items={enrichedWorkItems} />
         </div>
-        <Button variant="outline" asChild>
-          {/* 3. Use the unwrapped 'studioId' variable */}
+
+        <Button variant="outline" asChild className="mt-12">
           <Link href={`/${studioId}/portfolio`}>Explore Full Portfolio</Link>
         </Button>
       </section>
+
       {/* --- New Call-to-Action Section --- */}
-      {/* We only render this section if a Facebook URL exists in the database */}
+      {/* This only renders if a Facebook URL exists in the database */}
       {studioData.facebook_url && (
         <section className="container mx-auto px-4 py-16 md:py-24">
           <div className="bg-secondary py-16 md:py-15 rounded-3xl text-center max-w-5xl mx-auto px-6">

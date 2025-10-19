@@ -40,4 +40,5 @@ export type PortfolioItem = {
   facebook_post_url: string | null;
   thumbnail_url: string | null;
   description: string | null;
+  publicImageUrl?: string;
 };

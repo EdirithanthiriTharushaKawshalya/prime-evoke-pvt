@@ -5,7 +5,7 @@ import { PortfolioItem } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { ExternalLink } from "lucide-react"; // 👈 Import a new icon
 
-export async function PortfolioCard({ item }: { item: PortfolioItem }) {
+export function PortfolioCard({ item }: { item: PortfolioItem }) {
   let publicImageUrl = "/placeholder.jpg"; 
 
   if (item.thumbnail_url) {
