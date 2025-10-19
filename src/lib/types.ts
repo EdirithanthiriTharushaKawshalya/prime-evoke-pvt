@@ -30,3 +30,14 @@ export type ServicePackage = {
   features: string[] | null;
   studio_name: string | null;
 };
+
+// Add this new type
+export type PortfolioItem = {
+  id: number;
+  title: string;
+  category: string;
+  studio_slug: string;
+  facebook_post_url: string | null;
+  thumbnail_url: string | null;
+  description: string | null;
+};
