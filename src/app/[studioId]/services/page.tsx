@@ -7,87 +7,143 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { ServicePackage } from "@/lib/types";
+import { getStudioData } from "@/lib/data";
 
-// STEP 1: Define the shape of our data with a TypeScript type.
-// This tells our code exactly what a "package" looks like.
-type ServicePackage = {
-  id: number;
-  created_at: string;
-  name: string | null;
-  price: string | null;
-  description: string | null;
-  features: string[] | null; // Specifically, an array of strings
-  studio_name: string | null;
-};
+// Helper function to group packages by category
+function categorizeServices(packages: ServicePackage[]) {
+  const categorized: { [key: string]: ServicePackage[] } = {};
+  for (const pkg of packages) {
+    if (pkg.category) {
+      if (!categorized[pkg.category]) {
+        categorized[pkg.category] = [];
+      }
+      categorized[pkg.category].push(pkg);
+    }
+  }
+  // Return sorted categories
+  return Object.entries(categorized).sort((a, b) => a[0].localeCompare(b[0]));
+}
 
-// The page now receives "params" from the layout
 export default async function ServicesPage({
   params,
 }: {
-  params: { studioId: string };
+  params: Promise<{ studioId: string }>;
 }) {
-  const studioName = params.studioId
-    .replace(/-/g, " ")
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  const { studioId } = await params;
+  const studioData = await getStudioData(studioId);
 
-  // The query now uses the dynamic studioName to fetch the correct data!
+  // Fetch all services for this studio
   const { data, error } = await supabase
     .from("services")
     .select("*")
-    .eq("studio_name", studioName) // Use the dynamic name here
+    .eq("studio_name", studioData.name)
+    .order("category")
     .order("id");
 
   const packages: ServicePackage[] | null = data;
 
-  if (error) {
+  if (error || !packages) {
     console.error("Error fetching services:", error);
     return <p>Error loading services. Please try again later.</p>;
   }
 
+  // Group packages by category
+  const categorizedPackages = categorizeServices(packages);
+
+  // Handle case where there might be no packages
+  if (categorizedPackages.length === 0) {
+    return (
+      <div className="container mx-auto py-12 md:py-24 px-4 text-center">
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tighter mb-4">
+          {studioData.name} Services & Packages
+        </h1>
+        <p className="text-lg text-muted-foreground mt-2">
+          No packages available at this time. Please check back later.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto py-12 md:py-24 px-6">
+    <div className="container mx-auto py-12 md:py-24 px-4">
       {/* Page Header */}
-      <section className="text-center mb-12">
+      <section className="text-center mb-12 md:mb-16">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tighter">
-          Our Services & Packages
+          {studioData.name} Services & Packages
         </h1>
         <p className="text-lg text-muted-foreground mt-2 max-w-2xl mx-auto">
-          Choose the perfect package that fits the needs of your special day.
+          Choose the perfect package that fits your needs.
         </p>
       </section>
 
-      {/* Packages Section */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Now TypeScript knows what 'pkg' is, and the error on 'feature' is gone! */}
-        {packages?.map((pkg) => (
-          <Card key={pkg.id} className="flex flex-col">
-            <CardHeader>
-              <CardTitle className="text-2xl">{pkg.name}</CardTitle>
-              <CardDescription>{pkg.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <p className="text-3xl font-bold mb-6">{pkg.price}</p>
-              <ul className="space-y-4">
-                {pkg.features?.map((feature) => (
-                  <li key={feature} className="flex items-center gap-2">
-                    <Check className="h-5 w-5 text-green-500" />
-                    <span className="text-muted-foreground">{feature}</span>
-                  </li>
+      {/* --- Tabbed Interface for Packages --- */}
+      <section>
+        <Tabs defaultValue={categorizedPackages[0]?.[0]} className="w-full">
+          {/* 1. Add a wrapper div to center and control width */}
+          <div className="flex justify-center mb-8">
+            <TabsList className="grid w-full max-w-lg grid-cols-2 md:grid-cols-4 bg-secondary p-1 rounded-full h-auto">
+              {" "}
+              {/* Adjusted max-width */}
+              {categorizedPackages.map(([category]) => (
+                <TabsTrigger
+                  key={category}
+                  value={category}
+                  // 2. Updated active state styles
+                  className="rounded-full data-[state=active]:bg-[#2563eb] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground transition-colors duration-200" // Use specific blue, white text for active
+                >
+                  {category}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+
+          {/* Create the Tab Content Panels */}
+          {categorizedPackages.map(([category, categoryPackages]) => (
+            <TabsContent key={category} value={category}>
+              {/* Grid for packages within this category */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {categoryPackages.map((pkg) => (
+                  <Card key={pkg.id} className="flex flex-col bg-card/80">
+                    <CardHeader>
+                      <CardTitle className="text-xl md:text-2xl">
+                        {pkg.name}
+                      </CardTitle>
+                      <CardDescription>{pkg.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                      <p className="text-2xl md:text-3xl font-bold mb-6">
+                        {pkg.price}
+                      </p>
+                      <ul className="space-y-3">
+                        {pkg.features?.map((feature) => (
+                          <li
+                            key={feature}
+                            className="flex items-start gap-2 text-sm"
+                          >
+                            <Check className="h-4 w-4 text-green-500 mt-1 flex-shrink-0" />
+                            <span className="text-muted-foreground">
+                              {feature}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                    <CardFooter>
+                      <Button asChild className="w-full">
+                        <Link href={`/${studioId}/book`}>Inquire Now</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
                 ))}
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button asChild className="w-full">
-                <Link href="/evoke-gallery/book">Inquire Now</Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
       </section>
     </div>
   );

@@ -9,9 +9,9 @@ export async function StudioFooter({ studioId }: { studioId: string }) {
   // 2. Updated the list of services
   const serviceLinks = [
     { name: "Portraits", href: `/${studioId}/services` },
-    { name: "Wedding Coverage", href: `/${studioId}/services` },
+    { name: "Weddings", href: `/${studioId}/services` },
     { name: "Events", href: `/${studioId}/services` },
-    { name: "Graduation Cover", href: `/${studioId}/services` },
+    { name: "Birthdays", href: `/${studioId}/services` },
   ];
 
   return (
