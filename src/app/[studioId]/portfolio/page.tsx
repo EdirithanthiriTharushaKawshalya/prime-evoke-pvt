@@ -19,14 +19,14 @@ function categorizeItems(items: PortfolioItem[]) {
 export default async function PortfolioPage({
   params,
 }: {
-  params: Promise<{ studioId: string }>; // 1. Correctly type params as Promise
+  params: Promise<{ studioId: string }>;
 }) {
-  const { studioId } = await params; // 2. Await params at the start
+  const { studioId } = await params;
 
   const studioData = await getStudioData(studioId);
   const portfolioItems = await getPortfolioItems(studioId);
 
-  // 3. Enrich items with image URLs ON THE SERVER
+  // Enrich items with image URLs ON THE SERVER
   const enrichedItems = await Promise.all(
     portfolioItems.map(async (item) => {
       let publicImageUrl = "/placeholder.jpg";
@@ -45,13 +45,14 @@ export default async function PortfolioPage({
     })
   );
 
-  // 4. Categorize the ENRICHED items
+  // Categorize the ENRICHED items
   const categorizedItems = categorizeItems(enrichedItems);
 
   return (
     <div className="container mx-auto py-12 md:py-24 px-6">
       {/* Page Header */}
-      <section className="text-center mb-12">
+      {/* 1. Added fade-up animation */}
+      <section className="text-center mb-12" data-aos="fade-up">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tighter">
           {studioData.name} Portfolio
         </h1>
@@ -63,13 +64,17 @@ export default async function PortfolioPage({
 
       {/* Categories Section */}
       <section className="space-y-12">
-        {Object.entries(categorizedItems).map(([category, items]) => (
-          <div key={category}>
+        {Object.entries(categorizedItems).map(([category, items], categoryIndex) => (
+          // 2. Added fade-up animation to each category section with a delay
+          <div key={category} data-aos="fade-up" data-aos-delay={categoryIndex * 100}>
             <h2 className="text-3xl font-bold mb-6">{category}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {/* 5. Pass the ENRICHED item to the NON-ASYNC card */}
-              {items.map((item) => (
-                <PortfolioCard key={item.id} item={item} />
+              {items.map((item, itemIndex) => (
+                // 3. Added fade-up animation to each card with staggered delay
+                <div key={item.id} data-aos="fade-up" data-aos-delay={itemIndex * 100}>
+                  <PortfolioCard item={item} />
+                </div>
               ))}
             </div>
           </div>

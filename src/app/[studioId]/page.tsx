@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Facebook } from "lucide-react";
 import { PortfolioCarousel } from "@/components/ui/PortfolioCarousel";
 import { PortfolioCard } from "@/components/ui/PortfolioCard"; // Import the NON-ASYNC PortfolioCard
+import { AnimatedStats } from "@/components/ui/AnimatedStats";
 
 export default async function StudioHomePage({
   params,
@@ -26,7 +27,6 @@ export default async function StudioHomePage({
   ).slice(0, 6);
 
   // 3. "Enrich" the portfolio items with their public image URLs
-  // This must be done on the server before passing to the client component
   const enrichedWorkItems = await Promise.all(
     recentWorkItems.map(async (item) => {
       let publicImageUrl = "/placeholder.jpg";
@@ -58,11 +58,11 @@ export default async function StudioHomePage({
 
   return (
     <>
-      {/* --- New Hero Section --- */}
-      <section className="container mx-auto py-16 md:py-16 px-4">
+      {/* --- Hero Section --- */}
+      <section className="container mx-auto py-16 md:py-16 px-4" data-aos="fade-up">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 items-center">
           {/* Left Column: Text Content */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-3" data-aos="fade-up" data-aos-delay="100">
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
               {studioData.hero_subtitle}
             </p>
@@ -73,29 +73,17 @@ export default async function StudioHomePage({
               {studioData.hero_description}
             </p>
             <Button size="lg" asChild>
-              {/* Use the unwrapped studioId variable */}
               <Link href={`/${studioId}/book`}>Book Now</Link>
             </Button>
 
             <hr className="my-12 opacity-30" />
 
-            {/* Stats Section */}
-            {studioData.stats && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
-                {studioData.stats.map((stat) => (
-                  <div key={stat.label}>
-                    <p className="text-4xl font-bold">{stat.value}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {stat.label}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Stats Section now uses the AnimatedStats client component */}
+            {studioData.stats && <AnimatedStats stats={studioData.stats} />}
           </div>
 
           {/* Right Column: Image */}
-          <div className="md:col-span-2">
+          <div className="md:col-span-2" data-aos="fade-up" data-aos-delay="200">
             <Image
               src={heroImageUrl}
               alt={studioData.name || "Studio Hero Image"}
@@ -108,7 +96,8 @@ export default async function StudioHomePage({
       </section>
 
       {/* --- New Portfolio Preview Section --- */}
-      <section className="container mx-auto py-16 md:py-24 text-center">
+      {/* Animate the entire section */}
+      <section className="container mx-auto py-16 md:py-24 text-center" data-aos="fade-up">
         <h2 className="text-3xl font-bold mb-8">Our Recent Work</h2>
 
         <div className="px-12">
@@ -129,7 +118,8 @@ export default async function StudioHomePage({
       {/* --- New Call-to-Action Section --- */}
       {/* This only renders if a Facebook URL exists in the database */}
       {studioData.facebook_url && (
-        <section className="container mx-auto px-4 py-16 md:py-24">
+        // Animate the entire section
+        <section className="container mx-auto px-4 py-16 md:py-24" data-aos="fade-up" data-aos-delay="100">
           <div className="bg-secondary py-16 md:py-15 rounded-3xl text-center max-w-5xl mx-auto px-6">
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
               Connect With Us

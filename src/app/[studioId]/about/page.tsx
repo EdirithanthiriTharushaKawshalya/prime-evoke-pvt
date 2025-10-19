@@ -28,9 +28,11 @@ export default async function AboutPage({
   }
 
   return (
-    <div className="container mx-auto py-12 md:py-24 px-6">
+    <div className="container mx-auto py-12 md:py-24 px-6"
+    data-aos="fade-up"
+    >
       {/* Page Header */}
-      <section className="text-center mb-12 md:mb-16">
+      <section className="text-center mb-12 md:mb-16" data-aos="fade-up">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tighter">
           About {studioData.name}
         </h1>
@@ -40,7 +42,7 @@ export default async function AboutPage({
       </section>
 
       {/* Main Content Section */}
-      <section className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-12 items-center">
+      <section className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-12 items-center" data-aos="fade-up" >
         {/* --- Updated Image Section --- */}
         <div className="md:col-span-2 flex items-center justify-center p-4">
           {" "}
@@ -67,7 +69,7 @@ export default async function AboutPage({
       </section>
 
       {/* Final CTA Section */}
-      <section className="mt-16 md:mt-24 text-center bg-secondary py-16 rounded-3xl max-w-5xl mx-auto px-6">
+      <section className="mt-16 md:mt-24 text-center bg-secondary py-16 rounded-3xl max-w-5xl mx-auto px-6" data-aos="fade-up">
         <h2 className="text-3xl font-bold mb-4">Let&apos;s Tell Your Story</h2>
         <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
           We would be honored to be a part of your journey. Reach out to discuss

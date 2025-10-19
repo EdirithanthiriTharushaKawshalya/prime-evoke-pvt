@@ -13,7 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function BookingPage() {
   return (
-    <div className="container mx-auto py-12 md:py-24 px-6 flex items-center justify-center">
+    <div className="container mx-auto py-12 md:py-24 px-6 flex items-center justify-center"
+    data-aos="fade-up"
+    >
       <Card className="w-full max-w-2xl">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold tracking-tighter">

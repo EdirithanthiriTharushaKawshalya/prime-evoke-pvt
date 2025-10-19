@@ -17,8 +17,11 @@ export default function HomePage() {
       <AnimatedBackground />
       <Header />
       {/* Hero Section */}
-      {/* 1. ADDED px-4 for mobile padding */}
-      <section className="text-center py-20 md:py-32 px-4">
+      {/* 1. Added fade-up animation */}
+      <section
+        className="text-center py-20 md:py-32 px-4"
+        data-aos="fade-up" // <-- Animation added
+      >
         <div className="container mx-auto">
           <h1 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4">
             Capturing Moments, Crafting Sound.
@@ -31,11 +34,15 @@ export default function HomePage() {
       </section>
 
       {/* Sub-Brands Gateway Section */}
-      {/* 2. ADDED px-4 for mobile padding */}
       <section className="container mx-auto pb-20 md:pb-32 px-4">
         <div className="grid grid-cols-1 gap-8 max-w-4xl mx-auto">
           {/* Evoke Gallery Card */}
-          <Card className="flex flex-col rounded-3xl md:rounded-full text-center">
+          {/* 2. Added fade-up animation with delay */}
+          <Card
+            className="flex flex-col rounded-3xl md:rounded-full text-center"
+            data-aos="fade-up" // <-- Animation added
+            data-aos-delay="100" // <-- Staggered delay added
+          >
             <CardHeader className="flex-1 p-8 md:p-12">
               <CardTitle className="text-2xl">Evoke Gallery</CardTitle>
               <CardDescription>
@@ -54,7 +61,12 @@ export default function HomePage() {
           </Card>
 
           {/* Studio Zine Card */}
-          <Card className="flex flex-col rounded-3xl md:rounded-full text-center">
+          {/* 3. Added fade-up animation with delay */}
+          <Card
+            className="flex flex-col rounded-3xl md:rounded-full text-center"
+            data-aos="fade-up" // <-- Animation added
+            data-aos-delay="200" // <-- Staggered delay added
+          >
             <CardHeader className="flex-1 p-8 md:p-12">
               <CardTitle className="text-2xl">Studio Zine</CardTitle>
               <CardDescription>Creative Visual Storytelling</CardDescription>
@@ -71,7 +83,12 @@ export default function HomePage() {
           </Card>
 
           {/* Evoke Waves Card */}
-          <Card className="flex flex-col rounded-3xl md:rounded-full text-center">
+          {/* 4. Added fade-up animation with delay */}
+          <Card
+            className="flex flex-col rounded-3xl md:rounded-full text-center"
+            data-aos="fade-up" // <-- Animation added
+            data-aos-delay="300" // <-- Staggered delay added
+          >
             <CardHeader className="flex-1 p-8 md:p-12">
               <CardTitle className="text-2xl">Evoke Waves</CardTitle>
               <CardDescription>Music Production & Sound Design</CardDescription>
