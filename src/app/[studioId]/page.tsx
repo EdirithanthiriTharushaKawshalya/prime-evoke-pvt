@@ -32,7 +32,7 @@ export default async function StudioHomePage({
       let publicImageUrl = "/placeholder.jpg";
       if (item.thumbnail_url) {
         const { data } = supabase.storage
-          .from("studio-images") // Make sure this bucket name is correct!
+          .from("portfolio-thumbnails") // Make sure this bucket name is correct!
           .getPublicUrl(item.thumbnail_url);
         if (data) {
           publicImageUrl = data.publicUrl;
