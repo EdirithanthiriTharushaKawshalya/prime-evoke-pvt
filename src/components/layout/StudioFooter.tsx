@@ -63,8 +63,8 @@ export async function StudioFooter({ studioId }: { studioId: string }) {
             </h4>
             <div className="text-muted-foreground space-y-2">
               <p className="font-bold text-white">{studioData.name}</p>
-              <p>405B 1/1, Old Kottawa Road, Udahamulla,</p>
-              <p>Nugegoda, Sri Lanka</p>
+              <p>No.2, Sri Medananda Road, </p>
+              <p>Ambalangoda, Sri Lanka.</p>
               <p className="pt-2">
                 <span className="font-semibold text-white">Phone:</span> 0777 16 46 00
               </p>
