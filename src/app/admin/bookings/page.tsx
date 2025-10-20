@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AssignPhotographers } from "@/components/ui/AssignPhotographers";
 import { Booking, Profile, TeamMember } from "@/lib/types";
+import { LogoutButton } from '@/components/ui/LogoutButton';
 
 // Helper function to group bookings by month
 const groupBookingsByMonth = (bookings: Booking[]) => {
@@ -158,6 +159,7 @@ export default async function AdminBookingsPage() {
   return (
     <div className="container mx-auto py-10 px-4">
       <h1 className="text-3xl font-bold mb-6">Client Bookings</h1>
+      <LogoutButton />
       <p className="mb-4 text-muted-foreground">
         Viewing as: {userRole} ({userName})
       </p>
