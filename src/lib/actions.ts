@@ -1,49 +1,65 @@
-"use server"; // Mark this file as Server Actions
+"use server";
 
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache'; // To refresh the page data after update
+import { revalidatePath } from 'next/cache';
 
-export async function updateBookingAssignments(bookingId: number, newAssignments: string[]) {
-  const cookieStore = cookies();
+export async function updateBookingAssignments(
+  bookingId: number,
+  newAssignments: string[]
+) {
+  // Await cookies() because it's a Promise in Next.js 15
+  const cookieStore = await cookies();
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) { return cookieStore.get(name)?.value },
-        set(name: string, value: string, options: CookieOptions) { cookieStore.set(name, value, options) }, // Simplified for Server Action context
-        remove(name: string, options: CookieOptions) { cookieStore.set(name, '', options) },
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
       },
     }
   );
 
-  // Check if user is authenticated and has management role (important security check)
-   const { data: { session } } = await supabase.auth.getSession();
-   if (!session) return { error: "Not authenticated" };
+  // Check if user is authenticated
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
 
-   const { data: profile } = await supabase
-       .from('profiles')
-       .select('role')
-       .eq('id', session.user.id)
-       .single();
+  // Fetch user profile to verify role
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
 
-   if (profile?.role !== 'management') {
-       return { error: "Permission denied. Only management can assign photographers." };
-   }
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
 
-  // Perform the update
-  const { error } = await supabase
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can assign photographers." };
+  }
+
+  // Update the booking assignments
+  const { error: updateError } = await supabase
     .from('client_bookings')
     .update({ assigned_photographers: newAssignments })
     .eq('id', bookingId);
 
-  if (error) {
-    console.error("Server Action Error updating assignments:", error);
-    return { error: error.message };
+  if (updateError) {
+    console.error("Error updating assignments:", updateError);
+    return { error: updateError.message };
   }
 
-  // Revalidate the path to update the UI
+  // Revalidate page to reflect changes
   revalidatePath('/admin/bookings');
+
   return { success: true };
 }
