@@ -51,3 +51,13 @@ export type WhyChooseUsPoint = {
   title: string;
   description: string;
 };
+
+export interface TeamMember {
+  linkedin_url: any;
+  name: string;
+  position: string;
+  image_url?: string;
+  primary_employment?: string;
+  degrees?: string[];
+  bio: string;
+}

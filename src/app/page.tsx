@@ -104,6 +104,18 @@ export default function HomePage() {
             </CardFooter>
           </Card>
         </div>
+
+        {/* --- Meet the Team Link Section --- */}
+        <section className="mt-16 md:mt-30 text-center" data-aos="fade-up">
+          <h2 className="text-3xl font-bold mb-4">Meet Our Team</h2>
+          <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
+            Discover the passionate and qualified individuals behind Prime
+            Evoke.
+          </p>
+          <Button size="lg" asChild>
+            <Link href="/team">View Team Profiles</Link>
+          </Button>
+        </section>
       </section>
       <Footer />
     </div>
