@@ -1,8 +1,10 @@
-"use client"; // This component runs in the browser
+"use client";
 
-import React, { useEffect } from 'react';
+// 1. Remove the React import
+// import React, { useEffect } from 'react';
+import { useEffect } from 'react'; // Keep only useEffect
 import AOS from 'aos';
-import 'aos/dist/aos.css'; // Import AOS styles
+import 'aos/dist/aos.css';
 
 export function AOSInitializer() {
   useEffect(() => {

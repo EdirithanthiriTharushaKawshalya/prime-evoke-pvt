@@ -5,16 +5,15 @@ import { Footer } from "@/components/layout/Footer";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 
-export default async function TeamPage({
-  params,
-}: {
-  params: Promise<{ studioId: string }>;
-}) {
-  const { studioId } = await params; // Needs async fix if not already done
-  const teamMembers = await getTeamMembers(); // Fetch all members
+// 1. Remove 'params' from the function signature
+export default async function TeamPage() {
+  // 2. Remove the line that extracts 'studioId'
+  // const { studioId } = await params; // DELETE THIS LINE
 
-  const management = teamMembers.filter((m) => m.is_management);
-  const staff = teamMembers.filter((m) => !m.is_management);
+  const teamMembers = await getTeamMembers();
+
+  const management = teamMembers.filter(m => m.is_management);
+  const staff = teamMembers.filter(m => !m.is_management);
 
   return (
     <Dialog>

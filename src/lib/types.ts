@@ -52,12 +52,16 @@ export type WhyChooseUsPoint = {
   description: string;
 };
 
-export interface TeamMember {
-  linkedin_url: any;
+// --- FIX: Add the TeamMember type definition ---
+export type TeamMember = {
+  id: number;
+  created_at: string;
   name: string;
   position: string;
-  image_url?: string;
-  primary_employment?: string;
-  degrees?: string[];
-  bio: string;
-}
+  is_management: boolean | null;
+  primary_employment: string | null;
+  degrees: string[] | null; // Array of strings
+  bio: string | null;
+  image_url: string | null;
+  linkedin_url: string | null;
+};
