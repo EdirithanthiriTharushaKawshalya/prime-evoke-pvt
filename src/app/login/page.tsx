@@ -1,13 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation"; // Use App Router's router
-import { supabase } from "@/lib/supabaseClient"; // Use client-side Supabase
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { toast } from "sonner";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import Link from "next/link"; // Import Link for the logo
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -28,36 +36,44 @@ export default function LoginPage() {
       toast.error("Login Failed!", { description: error.message });
     } else {
       toast.success("Login Successful!");
-      router.push("/admin/bookings"); // Redirect to admin page after login
-      router.refresh(); // Force refresh to update server-side session state if needed
+      router.push("/admin/bookings");
+      router.refresh();
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account.
+    // Ensure container takes full height and centers content
+    <div className="relative flex items-center justify-center min-h-screen p-4">
+      <AnimatedBackground />
+      {/* --- Updated Card Styling --- */}
+      <Card className="w-full max-w-md bg-background/80 backdrop-blur-sm border border-white/10 rounded-xl shadow-lg"> {/* Added transparency, blur, border, rounded-xl */}
+        <CardHeader className="text-center pt-8 pb-4"> {/* Adjusted padding */}
+          {/* 1. Added Logo Link */}
+          <Link href="/" className="mb-4 inline-block text-xl font-bold tracking-tight text-white">
+             Prime Evoke <span className="text-muted-foreground">Private Limited </span>
+          </Link>
+          <CardTitle className="text-2xl text-white">Admin Login</CardTitle> {/* Adjusted title */}
+          <CardDescription className="text-muted-foreground/80"> {/* Adjusted description color */}
+            Enter your credentials to access the dashboard.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pb-8 px-6"> {/* Adjusted padding */}
           <form onSubmit={handleLogin} className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
+            <div className="grid gap-2 pl-5 pr-5">
+              <Label htmlFor="email" className="text-muted-foreground">Email</Label> {/* Adjusted label color */}
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="someone@example.com"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
+                className="bg-background/70 border-white/20 focus:border-white/50 " // Input styling
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
+            <div className="grid gap-2 pl-5 pr-5">
+              <Label htmlFor="password" className="text-muted-foreground">Password</Label> {/* Adjusted label color */}
               <Input
                 id="password"
                 type="password"
@@ -65,19 +81,14 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
+                className="bg-background/70 border-white/20 focus:border-white/50" // Input styling
               />
+              {/* Optional: Add "Forgot Password?" link here */}
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full mt-4" disabled={loading}> {/* Added margin-top */}
               {loading ? "Logging in..." : "Login"}
             </Button>
           </form>
-          {/* Optional: Add a link to a signup page if needed */}
-          {/* <div className="mt-4 text-center text-sm">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="underline">
-              Sign up
-            </Link>
-          </div> */}
         </CardContent>
       </Card>
     </div>
