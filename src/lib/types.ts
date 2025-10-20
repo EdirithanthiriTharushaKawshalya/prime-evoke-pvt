@@ -14,11 +14,12 @@ export type Studio = {
   hero_subtitle: string | null; // This is the "eyebrow" text
   about_text: string | null;
   photographer_image_url: string | null;
-  hero_description: string | null; 
-  hero_image_url: string | null; 
-  stats: Stat[] | null; 
+  hero_description: string | null;
+  hero_image_url: string | null;
+  stats: Stat[] | null;
   facebook_url: string | null;
   logo_url: string | null;
+  why_choose_us: WhyChooseUsPoint[] | null;
 };
 
 // This is the shape of your ServicePackage data
@@ -43,4 +44,10 @@ export type PortfolioItem = {
   thumbnail_url: string | null;
   description: string | null;
   publicImageUrl?: string;
+};
+
+// Define the shape of a single 'Why Choose Us' point
+export type WhyChooseUsPoint = {
+  title: string;
+  description: string;
 };

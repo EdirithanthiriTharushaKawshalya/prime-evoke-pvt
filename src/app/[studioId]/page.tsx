@@ -59,10 +59,17 @@ export default async function StudioHomePage({
   return (
     <>
       {/* --- Hero Section --- */}
-      <section className="container mx-auto py-16 md:py-16 px-4" data-aos="fade-up">
+      <section
+        className="container mx-auto py-16 md:py-16 px-4"
+        data-aos="fade-up"
+      >
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 items-center">
           {/* Left Column: Text Content */}
-          <div className="md:col-span-3" data-aos="fade-up" data-aos-delay="100">
+          <div
+            className="md:col-span-3"
+            data-aos="fade-up"
+            data-aos-delay="100"
+          >
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
               {studioData.hero_subtitle}
             </p>
@@ -83,7 +90,11 @@ export default async function StudioHomePage({
           </div>
 
           {/* Right Column: Image */}
-          <div className="md:col-span-2" data-aos="fade-up" data-aos-delay="200">
+          <div
+            className="md:col-span-2"
+            data-aos="fade-up"
+            data-aos-delay="200"
+          >
             <Image
               src={heroImageUrl}
               alt={studioData.name || "Studio Hero Image"}
@@ -97,7 +108,10 @@ export default async function StudioHomePage({
 
       {/* --- New Portfolio Preview Section --- */}
       {/* Animate the entire section */}
-      <section className="container mx-auto py-16 md:py-24 text-center" data-aos="fade-up">
+      <section
+        className="container mx-auto py-16 md:py-24 text-center"
+        data-aos="fade-up"
+      >
         <h2 className="text-3xl font-bold mb-8">Our Recent Work</h2>
 
         <div className="px-12">
@@ -115,11 +129,48 @@ export default async function StudioHomePage({
         </Button>
       </section>
 
+      {/* --- Why Choose Us Section --- */}
+      {/* Conditionally render if data exists */}
+      {studioData.why_choose_us && studioData.why_choose_us.length > 0 && (
+        <section
+          className="container mx-auto py-16 md:py-24 px-4"
+          data-aos="fade-up"
+        >
+          <div className="text-center md:text-left mb-12">
+            {" "}
+            {/* Adjusted text alignment for larger screens */}
+            <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Why Choose Us?
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tighter">
+              Unparalleled Excellence in Photography{" "}
+              {/* You might make this dynamic later */}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            {studioData.why_choose_us.map((point, index) => (
+              // Stagger animation for each point
+              <div key={index} data-aos="fade-up" data-aos-delay={index * 100}>
+                <p className="text-sm font-semibold text-muted-foreground mb-2">
+                  0{index + 1} {/* Display number */}
+                </p>
+                <h3 className="text-xl font-bold mb-3">{point.title}</h3>
+                <p className="text-muted-foreground">{point.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* --- New Call-to-Action Section --- */}
       {/* This only renders if a Facebook URL exists in the database */}
       {studioData.facebook_url && (
         // Animate the entire section
-        <section className="container mx-auto px-4 py-16 md:py-24" data-aos="fade-up" data-aos-delay="100">
+        <section
+          className="container mx-auto px-4 py-16 md:py-24"
+          data-aos="fade-up"
+          data-aos-delay="100"
+        >
           <div className="bg-secondary py-16 md:py-15 rounded-3xl text-center max-w-5xl mx-auto px-6">
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
               Connect With Us
