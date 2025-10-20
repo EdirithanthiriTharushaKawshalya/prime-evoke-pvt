@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import ReactMarkdown from 'react-markdown';
 
 // Assuming you'll fetch the image URL here (make it async)
 // Or pass the URL as a prop if fetching on the page
@@ -83,7 +84,18 @@ export async function TeamMemberCard({ member }: { member: TeamMember }) {
               </ul>
             </div>
           )}
-          <p className="text-muted-foreground leading-relaxed">{member.bio}</p>
+          {/* Render the bio using ReactMarkdown */}
+          {member.bio && (
+            <div className="text-muted-foreground leading-relaxed space-y-2">
+              <ReactMarkdown
+                components={{ // Optional: Customize paragraph styling if needed
+                  p: ({node, ...props}) => <p className="mb-2" {...props} />
+                }}
+              >
+                {member.bio}
+              </ReactMarkdown>
+            </div>
+          )}
           {/* Optional: Add LinkedIn link here if available */}
           {member.linkedin_url && (
             <a href={member.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">

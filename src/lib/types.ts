@@ -65,3 +65,25 @@ export type TeamMember = {
   image_url: string | null;
   linkedin_url: string | null;
 };
+
+// --- Add or Verify this Profile type ---
+export type Profile = {
+  id: string; // This should match the UUID from auth.users
+  updated_at: string | null;
+  full_name: string | null;
+  role: string; // Should be 'management' or 'worker'
+};
+
+export type Booking = {
+  id: number;
+  created_at: string;
+  full_name: string;
+  email: string;
+  event_type: string | null;
+  package_name: string | null;
+  event_date: string | null;
+  message: string | null;
+  studio_slug: string; // Keep this consistent
+  status: string | null;
+  assigned_photographers: string[] | null; // Corrected column name
+};

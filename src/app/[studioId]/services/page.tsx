@@ -116,7 +116,9 @@ export default async function ServicesPage({
                     data-aos="fade-up"
                     data-aos-delay={index * 100} // Stagger cards within tab
                   >
-                    <Card className="flex flex-col bg-card/80 h-full"> {/* Added h-full for consistent height */}
+                    <Card className="flex flex-col bg-card/80 h-full">
+                      {" "}
+                      {/* Added h-full for consistent height */}
                       <CardHeader>
                         <CardTitle className="text-xl md:text-2xl">
                           {pkg.name}
@@ -143,7 +145,13 @@ export default async function ServicesPage({
                       </CardContent>
                       <CardFooter>
                         <Button asChild className="w-full">
-                          <Link href={`/${studioId}/book`}>Inquire Now</Link>
+                          <Link
+                            href={`/${studioId}/book?category=${encodeURIComponent(
+                              pkg.category || ""
+                            )}&package=${encodeURIComponent(pkg.name || "")}`}
+                          >
+                            Inquire Now
+                          </Link>
                         </Button>
                       </CardFooter>
                     </Card>
