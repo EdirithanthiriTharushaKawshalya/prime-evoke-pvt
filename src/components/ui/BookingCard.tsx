@@ -57,7 +57,7 @@ export function BookingCard({ booking, userRole, availableStaff }: BookingCardPr
          </div>
         {booking.message && (
              <p className="text-xs pt-2 border-t border-white/10 text-muted-foreground italic">
-                 "{booking.message}"
+                 &quot;{booking.message}&quot;
              </p>
         )}
       </CardContent>
