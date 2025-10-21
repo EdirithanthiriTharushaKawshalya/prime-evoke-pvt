@@ -36,7 +36,7 @@ export default function LoginPage() {
       toast.error("Login Failed!", { description: error.message });
     } else {
       toast.success("Login Successful!");
-      router.push("/admin/bookings");
+      router.replace("/admin/bookings"); 
       router.refresh();
     }
   };
@@ -46,7 +46,9 @@ export default function LoginPage() {
     <div className="relative flex items-center justify-center min-h-screen p-4">
       <AnimatedBackground />
       {/* --- Updated Card Styling --- */}
-      <Card className="w-full max-w-md bg-background/80 backdrop-blur-sm border border-white/10 rounded-xl shadow-lg">
+      <Card className="w-full max-w-md bg-background/80 backdrop-blur-sm border border-white/10 rounded-xl shadow-lg"
+      data-aos="fade-up"
+      >
         {" "}
         {/* Added transparency, blur, border, rounded-xl */}
         <CardHeader className="text-center pt-8 pb-4">

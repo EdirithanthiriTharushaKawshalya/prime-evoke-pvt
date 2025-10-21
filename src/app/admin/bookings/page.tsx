@@ -1,19 +1,12 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { AssignPhotographers } from "@/components/ui/AssignPhotographers";
+import { BookingCard } from "@/components/ui/BookingCard";
 import { Booking, Profile, TeamMember } from "@/lib/types";
-import { LogoutButton } from '@/components/ui/LogoutButton';
+import { LogoutButton } from "@/components/ui/LogoutButton";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
 
 // Helper function to group bookings by month
 const groupBookingsByMonth = (bookings: Booking[]) => {
@@ -47,7 +40,7 @@ export default async function AdminBookingsPage() {
           const store = await cookies();
           try {
             store.set({ name, value, ...options });
-          } catch (err) {
+          } catch {
             // Ignore errors if middleware manages session updates
           }
         },
@@ -55,7 +48,7 @@ export default async function AdminBookingsPage() {
           const store = await cookies();
           try {
             store.delete({ name, ...options });
-          } catch (err) {
+          } catch {
             // Ignore errors if middleware manages session updates
           }
         },
@@ -118,13 +111,13 @@ export default async function AdminBookingsPage() {
     bookings = bookingData as Booking[];
   }
 
-  // --- Fetch Available staff (MODIFIED) ---
+  // --- Fetch Available Staff ---
   let assignableMembers: TeamMember[] = [];
 
   const { data: membersData, error: membersError } = await supabase
-    .from("team_members") // Table name
-    .select("id, name") // Fetch ID and name
-    .order("name"); // Sort alphabetically
+    .from("team_members")
+    .select("id, name")
+    .order("name");
 
   if (membersError) {
     console.error("Error fetching team members list:", membersError);
@@ -132,8 +125,10 @@ export default async function AdminBookingsPage() {
     assignableMembers = membersData as TeamMember[];
   }
 
-  // Filter valid staff
-  const availableStaff = assignableMembers.filter((m) => m.name);
+  const availableStaff = assignableMembers.filter((m) => m.name).map(m => ({ 
+    id: String(m.id), 
+    full_name: m.name 
+  }));
 
   // --- Grouping and Sorting ---
   const groupedBookings = groupBookingsByMonth(bookings);
@@ -157,83 +152,44 @@ export default async function AdminBookingsPage() {
 
   // --- Render ---
   return (
-    <div className="container mx-auto py-10 px-4">
-      <h1 className="text-3xl font-bold mb-6">Client Bookings</h1>
-      <LogoutButton />
-      <p className="mb-4 text-muted-foreground">
-        Viewing as: {userRole} ({userName})
-      </p>
-
-      {fetchError && (
-        <p className="text-destructive">Error loading bookings: {fetchError}</p>
-      )}
-      {!fetchError && bookings.length === 0 && <p>No bookings found.</p>}
-
-      {sortedMonths.map((monthYear) => (
-        <div key={monthYear} className="mb-10 overflow-x-auto">
-          <h2 className="text-2xl font-semibold mb-4 border-b pb-2">
-            {monthYear}
-          </h2>
-          <Table>
-            <TableCaption>Bookings for {monthYear}</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[200px]">Client</TableHead>
-                <TableHead>Studio</TableHead>
-                <TableHead>Event Date</TableHead>
-                <TableHead>Package</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="min-w-[250px]">Assigned</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groupedBookings[monthYear].map((booking) => (
-                <TableRow key={booking.id}>
-                  <TableCell>
-                    <div className="font-medium">{booking.full_name}</div>
-                    <div className="text-xs text-muted-foreground break-all">
-                      {booking.email}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {booking.studio_slug?.replace("-", " ") ?? "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    {booking.event_date ? (
-                      new Date(booking.event_date).toLocaleDateString("en-GB")
-                    ) : (
-                      <span className="text-muted-foreground">N/A</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="max-w-[150px] truncate">
-                    {booking.package_name ?? "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        booking.status === "New" ? "default" : "secondary"
-                      }
-                    >
-                      {booking.status ?? "N/A"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <AssignPhotographers
-                      bookingId={booking.id}
-                      currentAssignments={booking.assigned_photographers || []}
-                      userRole={userRole}
-                      availableStaff={availableStaff.map((m) => ({
-                        id: String(m.id),
-                        full_name: m.name,
-                      }))}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+    <div className="relative min-h-screen flex flex-col">
+      <AnimatedBackground />
+      <Header />
+      <div className="container mx-auto py-10 px-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Client Bookings</h1>
+          <LogoutButton />
         </div>
-      ))}
+        <p className="mb-8 text-muted-foreground">
+          Viewing as: {userRole} ({userName})
+        </p>
+
+        {fetchError && (
+          <p className="text-destructive">
+            Error loading bookings: {fetchError}
+          </p>
+        )}
+        {!fetchError && bookings.length === 0 && <p>No bookings found.</p>}
+
+        {sortedMonths.map((monthYear) => (
+          <div key={monthYear} className="mb-12">
+            <h2 className="text-2xl font-semibold mb-6 border-b pb-2">
+              {monthYear}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {groupedBookings[monthYear].map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  userRole={userRole}
+                  availableStaff={availableStaff}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <Footer />
     </div>
   );
 }
