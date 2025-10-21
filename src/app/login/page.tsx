@@ -46,21 +46,37 @@ export default function LoginPage() {
     <div className="relative flex items-center justify-center min-h-screen p-4">
       <AnimatedBackground />
       {/* --- Updated Card Styling --- */}
-      <Card className="w-full max-w-md bg-background/80 backdrop-blur-sm border border-white/10 rounded-xl shadow-lg"> {/* Added transparency, blur, border, rounded-xl */}
-        <CardHeader className="text-center pt-8 pb-4"> {/* Adjusted padding */}
+      <Card className="w-full max-w-md bg-background/80 backdrop-blur-sm border border-white/10 rounded-xl shadow-lg">
+        {" "}
+        {/* Added transparency, blur, border, rounded-xl */}
+        <CardHeader className="text-center pt-8 pb-4">
+          {" "}
+          {/* Adjusted padding */}
           {/* 1. Added Logo Link */}
-          <Link href="/" className="mb-4 inline-block text-xl font-bold tracking-tight text-white">
-             Prime Evoke <span className="text-muted-foreground">Private Limited </span>
+          <Link
+            href="/"
+            className="mb-4 inline-block text-xl font-bold tracking-tight text-white"
+          >
+            Prime Evoke{" "}
+            <span className="text-muted-foreground">Private Limited </span>
           </Link>
-          <CardTitle className="text-2xl text-white">Admin Login</CardTitle> {/* Adjusted title */}
-          <CardDescription className="text-muted-foreground/80"> {/* Adjusted description color */}
+          <CardTitle className="text-2xl text-white">Admin Login</CardTitle>{" "}
+          {/* Adjusted title */}
+          <CardDescription className="text-muted-foreground/80">
+            {" "}
+            {/* Adjusted description color */}
             Enter your credentials to access the dashboard.
           </CardDescription>
         </CardHeader>
-        <CardContent className="pb-8 px-6"> {/* Adjusted padding */}
+        <CardContent className="pb-8 px-6">
+          {" "}
+          {/* Adjusted padding */}
           <form onSubmit={handleLogin} className="grid gap-4">
             <div className="grid gap-2 pl-5 pr-5">
-              <Label htmlFor="email" className="text-muted-foreground">Email</Label> {/* Adjusted label color */}
+              <Label htmlFor="email" className="text-muted-foreground">
+                Email
+              </Label>{" "}
+              {/* Adjusted label color */}
               <Input
                 id="email"
                 type="email"
@@ -73,7 +89,10 @@ export default function LoginPage() {
               />
             </div>
             <div className="grid gap-2 pl-5 pr-5">
-              <Label htmlFor="password" className="text-muted-foreground">Password</Label> {/* Adjusted label color */}
+              <Label htmlFor="password" className="text-muted-foreground">
+                Password
+              </Label>{" "}
+              {/* Adjusted label color */}
               <Input
                 id="password"
                 type="password"
@@ -85,9 +104,14 @@ export default function LoginPage() {
               />
               {/* Optional: Add "Forgot Password?" link here */}
             </div>
-            <Button type="submit" className="w-full mt-4" disabled={loading}> {/* Added margin-top */}
-              {loading ? "Logging in..." : "Login"}
-            </Button>
+            
+            <div className="flex justify-center pt-2">
+              <Button type="submit" disabled={loading} className="px-15">
+                {" "}
+                {/* Example: Added px-12 */}
+                {loading ? "Logging in..." : "Login"}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
