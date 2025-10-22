@@ -125,7 +125,7 @@ export async function updateBookingStatus(bookingId: number, newStatus: string) 
   return { success: true };
 }
 
-// --- NEW: deleteBooking function ---
+// --- deleteBooking function ---
 export async function deleteBooking(bookingId: number) {
   const cookieStore = await cookies();
 
@@ -173,6 +173,173 @@ export async function deleteBooking(bookingId: number) {
   if (deleteError) {
     console.error("Error deleting booking:", deleteError);
     return { error: deleteError.message };
+  }
+
+  // Revalidate the path to refresh data on the admin page
+  revalidatePath('/admin/bookings');
+  return { success: true };
+}
+
+// --- getBookingStats function (Optional: For dashboard) ---
+export async function getBookingStats() {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Check if user is authenticated
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  // Get total bookings count
+  const { count: totalBookings, error: totalError } = await supabase
+    .from('client_bookings')
+    .select('*', { count: 'exact', head: true });
+
+  // Get new bookings count (status = 'New')
+  const { count: newBookings, error: newError } = await supabase
+    .from('client_bookings')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'New');
+
+  // Get confirmed bookings count (status = 'Confirmed')
+  const { count: confirmedBookings, error: confirmedError } = await supabase
+    .from('client_bookings')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'Confirmed');
+
+  // Get upcoming bookings (event_date in future)
+  const today = new Date().toISOString().split('T')[0];
+  const { count: upcomingBookings, error: upcomingError } = await supabase
+    .from('client_bookings')
+    .select('*', { count: 'exact', head: true })
+    .gte('event_date', today)
+    .neq('status', 'Cancelled');
+
+  if (totalError || newError || confirmedError || upcomingError) {
+    console.error("Error fetching booking stats:", { totalError, newError, confirmedError, upcomingError });
+    return { error: "Failed to fetch booking statistics" };
+  }
+
+  return {
+    total: totalBookings || 0,
+    new: newBookings || 0,
+    confirmed: confirmedBookings || 0,
+    upcoming: upcomingBookings || 0,
+  };
+}
+
+// --- getRecentBookings function (Optional: For dashboard) ---
+export async function getRecentBookings(limit: number = 5) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Check if user is authenticated
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: bookings, error } = await supabase
+    .from('client_bookings')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("Error fetching recent bookings:", error);
+    return { error: error.message };
+  }
+
+  return { bookings };
+}
+
+// --- updateBooking function (For comprehensive updates) ---
+export async function updateBooking(
+  bookingId: number,
+  updates: {
+    full_name?: string;
+    email?: string;
+    event_type?: string;
+    package_name?: string;
+    event_date?: string;
+    message?: string;
+    status?: string;
+    assigned_photographers?: string[];
+  }
+) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can update bookings." };
+  }
+
+  // Perform the update
+  const { error: updateError } = await supabase
+    .from('client_bookings')
+    .update(updates)
+    .eq('id', bookingId);
+
+  if (updateError) {
+    console.error("Error updating booking:", updateError);
+    return { error: updateError.message };
   }
 
   // Revalidate the path to refresh data on the admin page

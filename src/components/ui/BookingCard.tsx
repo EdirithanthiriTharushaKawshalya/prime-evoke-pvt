@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AssignPhotographers } from "./AssignPhotographers";
+import { UpdateStatusDropdown } from "./UpdateStatusDropdown";
 import { CalendarIcon, ClockIcon, PackageIcon, HashIcon } from "lucide-react";
 import { DeleteBookingButton } from "./DeleteBookingButton";
 
@@ -18,18 +19,15 @@ type BookingCardProps = {
   availableStaff: { id: string; full_name: string | null }[];
 };
 
-// Helper to determine badge color based on status
-const getStatusVariant = (status: string | null): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status?.toLowerCase()) {
-    case 'new': return 'default';
-    case 'confirmed': return 'secondary';
-    case 'completed': return 'outline';
-    case 'cancelled': return 'destructive';
-    default: return 'secondary';
-  }
-};
-
 export function BookingCard({ booking, userRole, availableStaff }: BookingCardProps) {
+  // Check if the event date is in the past
+  const isPastEvent = booking.event_date 
+    ? new Date(booking.event_date) < new Date()
+    : false;
+
+  // Determine if booking should show as "Past" (green) automatically
+  const shouldShowAsPast = isPastEvent && booking.status?.toLowerCase() !== "cancelled";
+
   return (
     <Card className="flex flex-col h-full bg-card/60 backdrop-blur-sm border border-white/10 shadow-md hover:shadow-lg transition-shadow duration-200">
       <CardHeader className="pb-4">
@@ -61,9 +59,16 @@ export function BookingCard({ booking, userRole, availableStaff }: BookingCardPr
               )}
             </div>
           </div>
-          <Badge variant={getStatusVariant(booking.status)} className="ml-2 shrink-0">
-            {booking.status ?? 'N/A'}
-          </Badge>
+          
+          {/* Status Badge/Dropdown */}
+          <div className="ml-2 shrink-0">
+            <UpdateStatusDropdown
+              bookingId={booking.id}
+              currentStatus={booking.status}
+              userRole={userRole}
+              isPast={shouldShowAsPast}
+            />
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-3 text-sm pt-0 pb-4">
@@ -73,7 +78,14 @@ export function BookingCard({ booking, userRole, availableStaff }: BookingCardPr
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           <CalendarIcon className="h-4 w-4" />
-          <span>Event Date: {booking.event_date ? new Date(booking.event_date).toLocaleDateString('en-GB') : 'N/A'}</span>
+          <span>
+            Event Date: {booking.event_date ? new Date(booking.event_date).toLocaleDateString('en-GB') : 'N/A'}
+            {isPastEvent && (
+              <Badge variant="outline" className="ml-2 text-xs bg-red-500/20 text-red-300 border-red-500/30">
+                Past Event
+              </Badge>
+            )}
+          </span>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           <ClockIcon className="h-4 w-4" />

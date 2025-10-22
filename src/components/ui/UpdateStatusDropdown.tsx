@@ -65,21 +65,32 @@ export function UpdateStatusDropdown({
   };
 
   const variant = getStatusVariant(status, isPast);
-  const displayText = isPast && status?.toLowerCase() !== "cancelled" ? "Past" : status;
+  
+  // Determine display text
+  let displayText = status;
+  if (isPast && status?.toLowerCase() !== "cancelled") {
+    displayText = "Completed";
+  }
 
   // Staff view: Read-only Badge
   if (userRole !== "management") {
-    // --- FIX: don't pass 'success' to the Badge variant prop ---
     if (variant === "success") {
-      // Render a styled Badge for 'past' state instead of passing an unknown variant
-      return <Badge className="bg-green-600 text-white">{displayText}</Badge>;
+      return (
+        <Badge className="bg-green-600 hover:bg-green-700 text-white border-0">
+          {displayText}
+        </Badge>
+      );
     }
     return <Badge variant={variant}>{displayText}</Badge>;
   }
 
-  // Management view (unchanged)
+  // Management view: Interactive dropdown
   return (
-    <Select value={status} onValueChange={handleStatusChange} disabled={isPending}>
+    <Select 
+      value={isPast && status?.toLowerCase() !== "cancelled" ? "Completed" : status} 
+      onValueChange={handleStatusChange} 
+      disabled={isPending || isPast}
+    >
       <SelectTrigger
         className={`w-[130px] h-8 text-xs font-medium border-none ring-offset-0 focus:ring-0 focus:ring-offset-0 ${
           variant === "success"
@@ -91,14 +102,20 @@ export function UpdateStatusDropdown({
             : variant === "outline"
             ? "border border-input bg-background hover:bg-accent hover:text-accent-foreground"
             : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-        }`}
+        } ${isPast ? "cursor-not-allowed opacity-70" : ""}`}
       >
-        <SelectValue placeholder="Set status">{displayText}</SelectValue>
+        <SelectValue placeholder="Set status">
+          {displayText}
+        </SelectValue>
       </SelectTrigger>
 
-      <SelectContent>
+      <SelectContent className="bg-gray-900 border-white/20 text-white">
         {STATUS_OPTIONS.map((option) => (
-          <SelectItem key={option} value={option}>
+          <SelectItem 
+            key={option} 
+            value={option}
+            className="hover:bg-gray-800 focus:bg-gray-800"
+          >
             {option}
           </SelectItem>
         ))}
