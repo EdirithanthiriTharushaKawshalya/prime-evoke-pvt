@@ -275,9 +275,9 @@ export default function BookingPage() {
 
             {/* Next Steps */}
             <div className="bg-blue-900/20 rounded-lg border border-blue-600/30 p-4 backdrop-blur-sm">
-              <h3 className="font-semibold text-blue-200 mb-2">What's Next?</h3>
+              <h3 className="font-semibold text-blue-200 mb-2">What&apos;s Next?</h3>
               <ul className="text-sm text-blue-200/80 space-y-1">
-                <li>• We'll contact you within 24 hours to confirm details</li>
+                <li>• We&apos;ll contact you within 24 hours to confirm details</li>
                 <li>• Keep your inquiry ID handy for reference</li>
                 <li>• Expect a follow-up message from us shortly regarding your inquiry</li>
               </ul>
