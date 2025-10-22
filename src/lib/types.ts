@@ -86,4 +86,5 @@ export type Booking = {
   studio_slug: string; // Keep this consistent
   status: string | null;
   assigned_photographers: string[] | null; // Corrected column name
+  inquiry_id: string | null; // Add inquiry ID field
 };

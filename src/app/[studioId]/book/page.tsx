@@ -25,7 +25,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { ServicePackage } from "@/lib/types";
-import { toast } from "sonner"; // Using sonner for toasts
+import { toast } from "sonner";
+import { CheckCircle, Copy, Calendar } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // --- 1. Define Form Schema with Zod ---
 const bookingSchema = z.object({
@@ -38,7 +40,6 @@ const bookingSchema = z.object({
   event_date: z
     .string()
     .refine((date) => new Date(date) >= new Date(new Date().toDateString()), {
-      // Allow today or future
       message: "Event date must be today or in the future.",
     }),
   message: z.string().optional(),
@@ -47,11 +48,11 @@ const bookingSchema = z.object({
 // --- 2. Main Booking Component ---
 export default function BookingPage() {
   const searchParams = useSearchParams();
-  const params = useParams(); // { studioId: 'evoke-gallery' }
+  const params = useParams();
 
   const prefilledPackage = searchParams.get("package");
   const prefilledCategory = searchParams.get("category");
-  const studioId = params.studioId as string; // Get the current studio slug
+  const studioId = params.studioId as string;
 
   // Derive studio name for display and filtering
   const studioName = studioId
@@ -65,11 +66,21 @@ export default function BookingPage() {
     "Birthday",
     "Event",
     "Portrait",
-  ]); // Or fetch dynamically if needed
+  ]);
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [selectedEventType, setSelectedEventType] = useState<
     string | undefined
   >(prefilledCategory || undefined);
+  const [submittedInquiry, setSubmittedInquiry] = useState<{
+    id: string;
+    inquiryId: string;
+    full_name: string;
+    email: string;
+    event_date: string;
+    package_name: string;
+    studio_slug: string;
+  } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof bookingSchema>>({
     resolver: zodResolver(bookingSchema),
@@ -86,21 +97,19 @@ export default function BookingPage() {
   // --- 3. Fetch Packages when Event Type Changes ---
   useEffect(() => {
     async function fetchPackages() {
-      // Don't fetch if category is prefilled, packages for it aren't needed in dropdown
       if (!selectedEventType || prefilledCategory) {
         setPackages([]);
         return;
       }
-      // Fetch packages from Supabase matching studioName and selectedEventType
+      
       const { data, error } = await supabase
         .from("services")
         .select("*")
-        .eq("studio_name", studioName) // Correct column name is studio_name
+        .eq("studio_name", studioName)
         .eq("category", selectedEventType);
 
       if (data) {
         setPackages(data as ServicePackage[]);
-        // If a package was prefilled but category wasn't, try to set it now
         if (prefilledPackage && !prefilledCategory) {
           form.setValue("package_name", prefilledPackage);
         }
@@ -109,15 +118,13 @@ export default function BookingPage() {
         toast.error("Could not load packages for this category.");
       }
     }
-    // Fetch immediately if category is selected (and not prefilled)
+    
     if (selectedEventType && !prefilledCategory) {
       fetchPackages();
     }
-    // Also fetch if category IS prefilled (to potentially set package default later)
+    
     if (prefilledCategory) {
-      setSelectedEventType(prefilledCategory); // Ensure state matches prefill
-      // We might fetch here too if we want to allow changing package even if prefilled
-      // fetchPackages();
+      setSelectedEventType(prefilledCategory);
     }
   }, [
     selectedEventType,
@@ -125,44 +132,172 @@ export default function BookingPage() {
     form,
     prefilledCategory,
     prefilledPackage,
-  ]); // Dependencies
+  ]);
 
-  // --- 4. Handle Form Submission ---
+  // --- 4. Generate Unique Inquiry ID ---
+  function generateInquiryId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 8);
+    return `INQ-${timestamp}-${random}`.toUpperCase();
+  }
+
+  // --- 5. Handle Form Submission ---
   async function onSubmit(values: z.infer<typeof bookingSchema>) {
-    // Ensure event_type and package_name are set correctly if prefilled
+    setIsSubmitting(true);
+    
+    const inquiryId = generateInquiryId();
     const submissionData = {
       ...values,
       event_type: prefilledCategory || values.event_type,
       package_name: prefilledPackage || values.package_name,
-      studio_slug: studioId, // Add the studio slug
+      studio_slug: studioId,
       status: "New",
+      inquiry_id: inquiryId, // Add the unique inquiry ID
     };
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("client_bookings")
         .insert([submissionData])
-        .select();
+        .select()
+        .single();
 
       if (error) throw error;
 
-      toast.success("Inquiry Submitted!", {
-        description: "We'll get back to you soon.",
+      // Store the submitted inquiry data for confirmation display
+      setSubmittedInquiry({
+        id: data.id,
+        inquiryId: data.inquiry_id,
+        full_name: data.full_name,
+        email: data.email,
+        event_date: data.event_date,
+        package_name: data.package_name,
+        studio_slug: data.studio_slug,
       });
-      form.reset(); // Clear the form
-      // Reset state only if fields were not prefilled
-      if (!prefilledCategory) setSelectedEventType(undefined);
-      if (!prefilledPackage) setPackages([]);
+
+      toast.success("Inquiry Submitted Successfully!", {
+        description: `Your inquiry ID: ${inquiryId}`,
+      });
+      
     } catch (error: unknown) {
       console.error("Booking submission error:", error);
-      // Check if error is an instance of Error to access message safely
       const errorMessage =
         error instanceof Error ? error.message : "Please try again.";
       toast.error("Submission Failed", { description: errorMessage });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  // --- 5. Render the Form ---
+  // --- 6. Copy Inquiry ID to Clipboard ---
+  const copyInquiryId = async () => {
+    if (submittedInquiry) {
+      try {
+        await navigator.clipboard.writeText(submittedInquiry.inquiryId);
+        toast.success("Inquiry ID copied to clipboard!");
+      } catch (err) {
+        toast.error("Failed to copy to clipboard");
+      }
+    }
+  };
+
+  // --- 7. Reset Form and Start New Inquiry ---
+  const startNewInquiry = () => {
+    setSubmittedInquiry(null);
+    form.reset();
+    if (!prefilledCategory) setSelectedEventType(undefined);
+    if (!prefilledPackage) setPackages([]);
+  };
+
+  // --- 8. Render Confirmation Screen ---
+  if (submittedInquiry) {
+    return (
+      <div className="container mx-auto py-16 px-4 max-w-2xl">
+        <Card className="border-green-200 bg-green-50/50">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <CheckCircle className="h-16 w-16 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-green-800">
+              Inquiry Submitted Successfully!
+            </CardTitle>
+            <CardDescription className="text-lg text-green-700">
+              Thank you for your interest in {studioName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Inquiry ID Section */}
+            <div className="bg-white rounded-lg border border-green-200 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-600">
+                  Your Inquiry ID:
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyInquiryId}
+                  className="flex items-center gap-2"
+                >
+                  <Copy className="h-3 w-3" />
+                  Copy
+                </Button>
+              </div>
+              <div className="bg-gray-100 rounded px-3 py-2 font-mono text-lg font-bold text-gray-800">
+                {submittedInquiry.inquiryId}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Please save this ID for future reference
+              </p>
+            </div>
+
+            {/* Inquiry Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-600">Name</p>
+                <p className="text-base">{submittedInquiry.full_name}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-600">Email</p>
+                <p className="text-base">{submittedInquiry.email}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-600">Package</p>
+                <p className="text-base">{submittedInquiry.package_name}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-600">Event Date</p>
+                <p className="text-base flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  {new Date(submittedInquiry.event_date).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Next Steps */}
+            <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+              <h3 className="font-semibold text-blue-800 mb-2">What's Next?</h3>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• We'll contact you within 24 hours to confirm details</li>
+                <li>• Keep your inquiry ID handy for reference</li>
+                <li>• Check your email for confirmation</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <Button onClick={startNewInquiry} variant="outline" className="flex-1">
+                Submit Another Inquiry
+              </Button>
+              <Button asChild className="flex-1">
+                <a href={`/${studioId}`}>Return to Studio</a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // --- 9. Render the Booking Form ---
   return (
     <div className="container mx-auto py-16 px-4 max-w-2xl">
       <h1 className="text-3xl font-bold text-center mb-2">Book Your Session</h1>
@@ -174,8 +309,6 @@ export default function BookingPage() {
           onSubmit={form.handleSubmit(onSubmit)}
           className="space-y-6 bg-card p-6 md:p-8 rounded-lg shadow-sm"
         >
-          {" "}
-          {/* Added card styling */}
           {/* --- Full Name --- */}
           <FormField
             control={form.control}
@@ -220,7 +353,7 @@ export default function BookingPage() {
                     onValueChange={(value) => {
                       field.onChange(value);
                       setSelectedEventType(value);
-                      form.setValue("package_name", ""); // Reset package when type changes
+                      form.setValue("package_name", "");
                     }}
                     defaultValue={field.value}
                   >
@@ -253,7 +386,7 @@ export default function BookingPage() {
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
-                    disabled={packages.length === 0} // Disable if no packages loaded
+                    disabled={packages.length === 0}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -271,8 +404,7 @@ export default function BookingPage() {
                         <SelectItem key={pkg.id} value={pkg.name || ""}>
                           {pkg.name} - {pkg.price}
                         </SelectItem>
-                      ))}{" "}
-                      {/* Show price */}
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -317,7 +449,7 @@ export default function BookingPage() {
                 <FormControl>
                   <Textarea
                     placeholder="Tell us a bit more about your event or any special requests."
-                    className="resize-none" // Prevent resizing
+                    className="resize-none"
                     rows={4}
                     {...field}
                   />
@@ -328,10 +460,10 @@ export default function BookingPage() {
           />
           <Button
             type="submit"
-            disabled={form.formState.isSubmitting}
+            disabled={isSubmitting}
             className="w-full"
           >
-            {form.formState.isSubmitting ? "Submitting..." : "Submit Inquiry"}
+            {isSubmitting ? "Submitting..." : "Submit Inquiry"}
           </Button>
         </form>
       </Form>

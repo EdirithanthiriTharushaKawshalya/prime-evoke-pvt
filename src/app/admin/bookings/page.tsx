@@ -157,7 +157,12 @@ export default async function AdminBookingsPage() {
       <Header />
       <div className="container mx-auto py-10 px-4">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Client Bookings</h1>
+          <div>
+            <h1 className="text-3xl font-bold">Client Bookings</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage all client inquiries with unique tracking IDs
+            </p>
+          </div>
           <LogoutButton />
         </div>
         <p className="mb-8 text-muted-foreground">
