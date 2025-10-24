@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, Calendar } from "lucide-react";
+import { Download } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -69,7 +69,7 @@ export function ReportDownloadButton({ userRole }: ReportDownloadButtonProps) {
         
         setIsOpen(false);
       }
-    } catch (error) {
+    } catch {
       toast.error("Download Failed", {
         description: "An unexpected error occurred."
       });

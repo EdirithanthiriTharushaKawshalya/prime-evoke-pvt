@@ -1,6 +1,7 @@
+// actions.ts - Full updated file
 "use server";
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 

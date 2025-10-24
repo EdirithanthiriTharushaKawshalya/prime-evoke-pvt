@@ -1,4 +1,4 @@
-import { Booking, Profile, TeamMember } from "@/lib/types";
+import { Booking } from "@/lib/types";
 import {
   Card,
   CardContent,
