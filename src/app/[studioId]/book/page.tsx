@@ -1,3 +1,4 @@
+// app/[studioId]/book/page.tsx - Full updated file
 "use client";
 
 import { useEffect, useState } from "react";
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/form";
 import { ServicePackage } from "@/lib/types";
 import { toast } from "sonner";
-import { CheckCircle, Copy, Calendar } from "lucide-react";
+import { CheckCircle, Copy, Calendar, Phone } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // --- 1. Define Form Schema with Zod ---
@@ -35,6 +36,10 @@ const bookingSchema = z.object({
     .string()
     .min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
+  mobile_number: z
+    .string()
+    .min(10, { message: "Mobile number must be at least 10 digits." })
+    .regex(/^[0-9+\-\s()]+$/, { message: "Please enter a valid mobile number." }),
   event_type: z.string().min(1, { message: "Please select an event type." }),
   package_name: z.string().min(1, { message: "Please select a package." }),
   event_date: z
@@ -76,6 +81,7 @@ export default function BookingPage() {
     inquiryId: string;
     full_name: string;
     email: string;
+    mobile_number: string;
     event_date: string;
     package_name: string;
     studio_slug: string;
@@ -87,6 +93,7 @@ export default function BookingPage() {
     defaultValues: {
       full_name: "",
       email: "",
+      mobile_number: "",
       event_type: prefilledCategory || "",
       package_name: prefilledPackage || "",
       event_date: "",
@@ -170,6 +177,7 @@ export default function BookingPage() {
         inquiryId: data.inquiry_id,
         full_name: data.full_name,
         email: data.email,
+        mobile_number: data.mobile_number,
         event_date: data.event_date,
         package_name: data.package_name,
         studio_slug: data.studio_slug,
@@ -195,7 +203,7 @@ export default function BookingPage() {
       try {
         await navigator.clipboard.writeText(submittedInquiry.inquiryId);
         toast.success("Inquiry ID copied to clipboard!");
-      } catch (err) {
+      } catch {
         toast.error("Failed to copy to clipboard");
       }
     }
@@ -259,6 +267,13 @@ export default function BookingPage() {
               <div className="space-y-1 bg-black/20 rounded-lg p-3 border border-white/10">
                 <p className="text-sm font-medium text-green-200/80">Email</p>
                 <p className="text-base text-white">{submittedInquiry.email}</p>
+              </div>
+              <div className="space-y-1 bg-black/20 rounded-lg p-3 border border-white/10">
+                <p className="text-sm font-medium text-green-200/80">Mobile Number</p>
+                <p className="text-base text-white flex items-center gap-1">
+                  <Phone className="h-4 w-4 text-green-400" />
+                  {submittedInquiry.mobile_number}
+                </p>
               </div>
               <div className="space-y-1 bg-black/20 rounded-lg p-3 border border-white/10">
                 <p className="text-sm font-medium text-green-200/80">Package</p>
@@ -331,6 +346,7 @@ export default function BookingPage() {
               </FormItem>
             )}
           />
+
           {/* --- Email --- */}
           <FormField
             control={form.control}
@@ -350,6 +366,27 @@ export default function BookingPage() {
               </FormItem>
             )}
           />
+
+          {/* --- Mobile Number --- */}
+          <FormField
+            control={form.control}
+            name="mobile_number"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-white">Mobile Number</FormLabel>
+                <FormControl>
+                  <Input
+                    type="tel"
+                    placeholder="Enter your mobile number"
+                    {...field}
+                    className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           {/* --- Event Type Dropdown (conditionally shown) --- */}
           {!prefilledCategory && (
             <FormField
@@ -384,6 +421,7 @@ export default function BookingPage() {
               )}
             />
           )}
+
           {/* --- Package Dropdown (conditionally shown/enabled) --- */}
           {!prefilledPackage && selectedEventType && (
             <FormField
@@ -421,6 +459,7 @@ export default function BookingPage() {
               )}
             />
           )}
+
           {/* --- Show prefilled info if applicable --- */}
           {prefilledCategory && (
             <div className="space-y-1 rounded-md border border-white/20 p-3 bg-black/30">
@@ -434,6 +473,7 @@ export default function BookingPage() {
               <p className="text-white">{prefilledPackage}</p>
             </div>
           )}
+
           {/* --- Event Date --- */}
           <FormField
             control={form.control}
@@ -452,6 +492,7 @@ export default function BookingPage() {
               </FormItem>
             )}
           />
+
           {/* --- Message --- */}
           <FormField
             control={form.control}
@@ -471,6 +512,7 @@ export default function BookingPage() {
               </FormItem>
             )}
           />
+
           <Button
             type="submit"
             disabled={isSubmitting}

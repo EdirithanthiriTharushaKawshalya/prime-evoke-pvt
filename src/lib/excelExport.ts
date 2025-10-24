@@ -136,10 +136,10 @@ function calculateTotalIncome(bookings: Booking[], packages: ServicePackage[]): 
   }, 0);
 }
 
-// Sheet generation functions
+// lib/excelExport.ts - Update the booking details sheet
 function generateBookingDetailsSheet(bookings: Booking[], packages: ServicePackage[]): (string | number)[][] {
   const headers = [
-    'Inquiry ID', 'Client Name', 'Email', 'Event Type', 'Package', 
+    'Inquiry ID', 'Client Name', 'Email', 'Mobile Number', 'Event Type', 'Package', 
     'Event Date', 'Status', 'Assigned Staff', 'Package Price', 'Contact Date'
   ];
   
@@ -151,6 +151,7 @@ function generateBookingDetailsSheet(bookings: Booking[], packages: ServicePacka
       booking.inquiry_id || 'N/A',
       booking.full_name,
       booking.email,
+      booking.mobile_number || 'N/A',
       booking.event_type || 'N/A',
       booking.package_name || 'N/A',
       booking.event_date ? new Date(booking.event_date).toLocaleDateString() : 'N/A',

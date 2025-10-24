@@ -74,17 +74,19 @@ export type Profile = {
   role: string; // Should be 'management' or 'worker'
 };
 
+
 export type Booking = {
   id: number;
   created_at: string;
   full_name: string;
   email: string;
+  mobile_number: string | null; 
   event_type: string | null;
   package_name: string | null;
   event_date: string | null;
   message: string | null;
-  studio_slug: string; // Keep this consistent
+  studio_slug: string;
   status: string | null;
-  assigned_photographers: string[] | null; // Corrected column name
-  inquiry_id: string | null; // Add inquiry ID field
+  assigned_photographers: string[] | null;
+  inquiry_id: string | null;
 };

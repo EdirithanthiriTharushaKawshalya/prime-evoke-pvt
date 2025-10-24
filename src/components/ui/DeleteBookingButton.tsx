@@ -1,50 +1,57 @@
+// components/ui/DeleteBookingButton.tsx
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Trash2, Loader2 } from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteBooking } from "@/lib/actions";
 
 interface DeleteBookingButtonProps {
   bookingId: number;
-  inquiryId: string | null;
-  className?: string;
+  userRole: string;
 }
 
-export function DeleteBookingButton({ bookingId, inquiryId, className }: DeleteBookingButtonProps) {
+export function DeleteBookingButton({
+  bookingId,
+  userRole,
+}: DeleteBookingButtonProps) {
+  const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Only management can delete bookings
+  if (userRole !== "management") {
+    return null;
+  }
 
   const handleDelete = async () => {
     setIsDeleting(true);
+    
     try {
       const result = await deleteBooking(bookingId);
       
-      if (result?.error) {
+      if (result.error) {
         toast.error("Delete Failed", {
-          description: result.error
+          description: result.error,
         });
       } else {
         toast.success("Booking Deleted", {
-          description: `Inquiry ${inquiryId || bookingId} has been permanently deleted.`
+          description: "The booking has been successfully deleted.",
         });
-        setIsDialogOpen(false);
+        setIsOpen(false);
       }
-    } catch (error) {
+    } catch {
       toast.error("Delete Failed", {
-        description: "An unexpected error occurred. Please try again."
+        description: "An unexpected error occurred.",
       });
     } finally {
       setIsDeleting(false);
@@ -52,41 +59,38 @@ export function DeleteBookingButton({ bookingId, inquiryId, className }: DeleteB
   };
 
   return (
-    <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="destructive"
-          size="sm"
-          className={`h-8 w-8 p-0 ${className}`}
-          disabled={isDeleting}
-        >
-          {isDeleting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Trash2 className="h-4 w-4" />
-          )}
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="destructive" size="sm">
+          <Trash2 className="h-3 w-3 mr-1" />
+          Delete
         </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the booking inquiry
-            {inquiryId && ` (${inquiryId})`} and remove all associated data from our servers.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete Booking</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete this booking? This action cannot be
+            undone and all booking data will be permanently removed.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setIsOpen(false)}
+            disabled={isDeleting}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
             onClick={handleDelete}
             disabled={isDeleting}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             {isDeleting ? "Deleting..." : "Delete Booking"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

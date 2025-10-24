@@ -1,113 +1,170 @@
-import { Booking } from "@/lib/types";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { AssignPhotographers } from "./AssignPhotographers";
-import { UpdateStatusDropdown } from "./UpdateStatusDropdown";
-import { CalendarIcon, ClockIcon, PackageIcon, HashIcon } from "lucide-react";
-import { DeleteBookingButton } from "./DeleteBookingButton";
+// components/ui/BookingCard.tsx - Final version with all imports
+"use client";
 
-type BookingCardProps = {
+import { useState } from "react";
+import { Booking } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Edit, Mail, Calendar, User, Package, Building, Phone } from "lucide-react";
+import { UpdateBookingStatus } from "./UpdateBookingStatus";
+import { AssignPhotographers } from "./AssignPhotographers";
+import { DeleteBookingButton } from "./DeleteBookingButton";
+import { EditBookingDialog } from "./EditBookingDialog";
+
+interface BookingCardProps {
   booking: Booking;
   userRole: string;
-  availableStaff: { id: string; full_name: string | null }[];
-};
+  availableStaff: { id: string; full_name: string }[];
+}
 
 export function BookingCard({ booking, userRole, availableStaff }: BookingCardProps) {
-  // Check if the event date is in the past
-  const isPastEvent = booking.event_date 
-    ? new Date(booking.event_date) < new Date()
-    : false;
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  // Determine if booking should show as "Past" (green) automatically
-  const shouldShowAsPast = isPastEvent && booking.status?.toLowerCase() !== "cancelled";
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Not specified";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
 
   return (
-    <Card className="flex flex-col h-full bg-card/60 backdrop-blur-sm border border-white/10 shadow-md hover:shadow-lg transition-shadow duration-200">
-      <CardHeader className="pb-4">
-        <div className="flex justify-between items-start">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-lg mb-1 truncate">{booking.full_name}</CardTitle>
-                <CardDescription className="text-xs break-all">{booking.email}</CardDescription>
-                
-                {/* Inquiry ID Display */}
-                {booking.inquiry_id && (
-                  <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                    <HashIcon className="h-3 w-3" />
-                    <span className="font-mono bg-secondary px-2 py-1 rounded text-xs">
-                      {booking.inquiry_id}
-                    </span>
-                  </div>
-                )}
-              </div>
-              
-              {/* Delete Button for Management */}
-              {userRole === 'management' && (
-                <DeleteBookingButton 
-                  bookingId={booking.id}
-                  inquiryId={booking.inquiry_id}
-                  className="ml-2 shrink-0"
-                />
-              )}
+    <>
+      <Card className="hover:shadow-lg transition-shadow duration-200">
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="h-4 w-4" />
+                {booking.full_name}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {booking.inquiry_id}
+              </p>
             </div>
-          </div>
-          
-          {/* Status Badge/Dropdown */}
-          <div className="ml-2 shrink-0">
-            <UpdateStatusDropdown
+            <UpdateBookingStatus
               bookingId={booking.id}
-              currentStatus={booking.status}
+              currentStatus={booking.status || "New"}
               userRole={userRole}
-              isPast={shouldShowAsPast}
             />
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="flex-1 space-y-3 text-sm pt-0 pb-4">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <PackageIcon className="h-4 w-4" />
-          <span>{booking.package_name ?? 'N/A'} ({booking.studio_slug?.replace(/-/g, ' ') ?? 'N/A'})</span>
-        </div>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <CalendarIcon className="h-4 w-4" />
-          <span>
-            Event Date: {booking.event_date ? new Date(booking.event_date).toLocaleDateString('en-GB') : 'N/A'}
-            {isPastEvent && (
-              <Badge variant="outline" className="ml-2 text-xs bg-red-500/20 text-red-300 border-red-500/30">
-                Past Event
-              </Badge>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          {/* Email */}
+          <div className="flex items-center gap-2 text-sm">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Email:</span>
+            <a
+              href={`mailto:${booking.email}`}
+              className="text-blue-600 hover:underline"
+            >
+              {booking.email}
+            </a>
+          </div>
+
+          {/* Mobile Number */}
+          {booking.mobile_number && (
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Mobile:</span>
+              <a
+                href={`tel:${booking.mobile_number}`}
+                className="text-blue-600 hover:underline"
+              >
+                {booking.mobile_number}
+              </a>
+            </div>
+          )}
+
+          {/* Event Date */}
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Event Date:</span>
+            <span>{formatDate(booking.event_date)}</span>
+          </div>
+
+          {/* Event Type */}
+          {booking.event_type && (
+            <div className="flex items-center gap-2 text-sm">
+              <Building className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Event Type:</span>
+              <span>{booking.event_type}</span>
+            </div>
+          )}
+
+          {/* Package */}
+          {booking.package_name && (
+            <div className="flex items-center gap-2 text-sm">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Package:</span>
+              <span>{booking.package_name}</span>
+            </div>
+          )}
+
+          {/* Assigned Photographers */}
+          {booking.assigned_photographers &&
+            booking.assigned_photographers.length > 0 && (
+              <div className="text-sm">
+                <span className="text-muted-foreground">Assigned Staff:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {booking.assigned_photographers.map((photographer, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {photographer}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
             )}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <ClockIcon className="h-4 w-4" />
-          <span>Submitted: {new Date(booking.created_at).toLocaleDateString('en-GB')}</span>
-        </div>
-        {booking.message && (
-          <p className="text-xs pt-2 border-t border-white/10 text-muted-foreground italic">
-            &quot;{booking.message}&quot;
-          </p>
-        )}
-      </CardContent>
-      <CardFooter className="pt-0 border-t border-white/10 pt-4">
-        <div className="w-full">
-          <label className="text-xs font-medium text-muted-foreground block mb-1">Assigned Staff</label>
-          <AssignPhotographers
-            bookingId={booking.id}
-            currentAssignments={booking.assigned_photographers || []}
-            userRole={userRole}
-            availableStaff={availableStaff}
-          />
-        </div>
-      </CardFooter>
-    </Card>
+
+          {/* Message Preview */}
+          {booking.message && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Message:</span>
+              <p className="mt-1 line-clamp-2 text-muted-foreground">
+                {booking.message}
+              </p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2 pt-2">
+            {userRole === "management" && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditDialogOpen(true)}
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Edit
+                </Button>
+                <AssignPhotographers
+                  bookingId={booking.id}
+                  currentAssignments={booking.assigned_photographers || []}
+                  availableStaff={availableStaff}
+                  userRole={userRole}
+                />
+                <DeleteBookingButton
+                  bookingId={booking.id}
+                  userRole={userRole}
+                />
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Edit Dialog */}
+      {userRole === "management" && (
+        <EditBookingDialog
+          booking={booking}
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+        />
+      )}
+    </>
   );
 }
