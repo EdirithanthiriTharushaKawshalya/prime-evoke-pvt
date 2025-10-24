@@ -76,7 +76,7 @@ export function EditBookingDialog({ booking, open, onOpenChange }: EditBookingDi
         <DialogHeader>
           <DialogTitle>Edit Booking</DialogTitle>
           <DialogDescription>
-            Update the booking details below. Click save when you're done.
+            Update the booking details below. Click save when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
