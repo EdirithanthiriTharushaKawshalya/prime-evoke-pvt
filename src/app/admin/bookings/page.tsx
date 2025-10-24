@@ -1,7 +1,9 @@
+// app/admin/bookings/page.tsx - Full updated file
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BookingCard } from "@/components/ui/BookingCard";
+import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
 import { Booking, Profile, TeamMember } from "@/lib/types";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -163,7 +165,10 @@ export default async function AdminBookingsPage() {
               Manage all client inquiries with unique tracking IDs
             </p>
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-4">
+            <ReportDownloadButton userRole={userRole} />
+            <LogoutButton />
+          </div>
         </div>
         <p className="mb-8 text-muted-foreground">
           Viewing as: {userRole} ({userName})

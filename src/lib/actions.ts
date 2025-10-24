@@ -4,6 +4,93 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
+// --- generateMonthlyReport function ---
+export async function generateMonthlyReport(month: string, year: string) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Only management can generate reports
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !session) {
+    return { error: "Not authenticated" };
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can generate reports." };
+  }
+
+  try {
+    // Calculate date range for the month
+    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1).toISOString();
+    const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59).toISOString();
+
+    // Fetch bookings for the specific month
+    const { data: bookings, error: bookingsError } = await supabase
+      .from('client_bookings')
+      .select('*')
+      .gte('event_date', startDate.split('T')[0])
+      .lte('event_date', endDate.split('T')[0])
+      .order('event_date', { ascending: true });
+
+    if (bookingsError) throw bookingsError;
+
+    // Fetch all packages for price calculation
+    const { data: packages, error: packagesError } = await supabase
+      .from('services')
+      .select('*');
+
+    if (packagesError) throw packagesError;
+
+    // Fetch team members for staff assignment tracking
+    const { data: teamMembers, error: membersError } = await supabase
+      .from('team_members')
+      .select('*');
+
+    if (membersError) throw membersError;
+
+    // Generate Excel report
+    const { generateMonthlyExcelReport } = await import('@/lib/excelExport');
+    const excelBlob = await generateMonthlyExcelReport({
+      bookings: bookings || [],
+      packages: packages || [],
+      teamMembers: teamMembers || [],
+      month,
+      year
+    });
+
+    // Convert blob to base64 for response
+    const buffer = await excelBlob.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+
+    return { 
+      success: true, 
+      data: base64,
+      fileName: `bookings-report-${month}-${year}.xlsx`
+    };
+
+  } catch (error) {
+    console.error("Error generating monthly report:", error);
+    return { error: "Failed to generate report" };
+  }
+}
+
 // --- updateBookingAssignments function ---
 export async function updateBookingAssignments(
   bookingId: number,
