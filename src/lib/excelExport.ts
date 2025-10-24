@@ -136,22 +136,27 @@ function calculateTotalIncome(bookings: Booking[], packages: ServicePackage[]): 
   }, 0);
 }
 
-// lib/excelExport.ts - Update the booking details sheet
+// Update the booking details sheet
 function generateBookingDetailsSheet(bookings: Booking[], packages: ServicePackage[]): (string | number)[][] {
   const headers = [
-    'Inquiry ID', 'Client Name', 'Email', 'Mobile Number', 'Event Type', 'Package', 
+    'Inquiry ID', 'Client Name', 'Email', 'Mobile Number', 'Studio', 'Event Type', 'Package', 
     'Event Date', 'Status', 'Assigned Staff', 'Package Price', 'Contact Date'
   ];
   
   const data = bookings.map(booking => {
     const pkg = packages.find(p => p.name === booking.package_name);
     const assignedStaff = booking.assigned_photographers?.join(', ') || 'Unassigned';
+    const studioName = booking.studio_slug
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
     
     return [
       booking.inquiry_id || 'N/A',
       booking.full_name,
       booking.email,
       booking.mobile_number || 'N/A',
+      studioName,
       booking.event_type || 'N/A',
       booking.package_name || 'N/A',
       booking.event_date ? new Date(booking.event_date).toLocaleDateString() : 'N/A',

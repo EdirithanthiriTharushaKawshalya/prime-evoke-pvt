@@ -1,4 +1,4 @@
-// components/ui/EditBookingDialog.tsx
+// components/ui/EditBookingDialog.tsx - Add studio display
 "use client";
 
 import { useState } from "react";
@@ -15,6 +15,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Camera } from "lucide-react";
 import { toast } from "sonner";
 import { updateBooking } from "@/lib/actions";
 
@@ -35,6 +37,14 @@ export function EditBookingDialog({ booking, open, onOpenChange }: EditBookingDi
     event_date: booking.event_date || "",
     message: booking.message || "",
   });
+
+  // Format studio slug to readable name
+  const formatStudioName = (studioSlug: string) => {
+    return studioSlug
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,11 +86,24 @@ export function EditBookingDialog({ booking, open, onOpenChange }: EditBookingDi
         <DialogHeader>
           <DialogTitle>Edit Booking</DialogTitle>
           <DialogDescription>
-            Update the booking details below. Click save when you&apos;re done.
+            Update the booking details below. Click save when you're done.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
+            {/* Studio Display (Read-only) */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="studio" className="text-right">
+                Studio
+              </Label>
+              <div className="col-span-3 flex items-center gap-2">
+                <Camera className="h-4 w-4 text-muted-foreground" />
+                <Badge variant="secondary">
+                  {formatStudioName(booking.studio_slug)}
+                </Badge>
+              </div>
+            </div>
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="full_name" className="text-right">
                 Full Name

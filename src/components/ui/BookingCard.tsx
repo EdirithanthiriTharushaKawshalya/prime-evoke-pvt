@@ -1,4 +1,4 @@
-// components/ui/BookingCard.tsx - Final version with all imports
+// components/ui/BookingCard.tsx - Full updated file
 "use client";
 
 import { useState } from "react";
@@ -6,7 +6,7 @@ import { Booking } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Mail, Calendar, User, Package, Building, Phone } from "lucide-react";
+import { Edit, Mail, Calendar, User, Package, Building, Phone, Camera } from "lucide-react";
 import { UpdateBookingStatus } from "./UpdateBookingStatus";
 import { AssignPhotographers } from "./AssignPhotographers";
 import { DeleteBookingButton } from "./DeleteBookingButton";
@@ -28,6 +28,14 @@ export function BookingCard({ booking, userRole, availableStaff }: BookingCardPr
       month: "long",
       day: "numeric",
     });
+  };
+
+  // Format studio slug to readable name
+  const formatStudioName = (studioSlug: string) => {
+    return studioSlug
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   return (
@@ -53,6 +61,15 @@ export function BookingCard({ booking, userRole, availableStaff }: BookingCardPr
         </CardHeader>
 
         <CardContent className="space-y-3">
+          {/* Studio Badge */}
+          <div className="flex items-center gap-2 text-sm">
+            <Camera className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Studio:</span>
+            <Badge variant="secondary" className="text-xs">
+              {formatStudioName(booking.studio_slug)}
+            </Badge>
+          </div>
+
           {/* Email */}
           <div className="flex items-center gap-2 text-sm">
             <Mail className="h-4 w-4 text-muted-foreground" />
