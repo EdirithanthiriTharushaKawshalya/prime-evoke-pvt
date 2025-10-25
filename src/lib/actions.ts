@@ -5,7 +5,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-// --- generateMonthlyReport function ---
+// actions.ts - Only showing the updated generateMonthlyReport function
 export async function generateMonthlyReport(month: string, year: string) {
   const cookieStore = await cookies();
 
