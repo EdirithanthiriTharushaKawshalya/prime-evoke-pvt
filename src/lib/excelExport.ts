@@ -1,5 +1,5 @@
-// lib/excelExport.ts
-import { Booking, ServicePackage, TeamMember } from './types';
+// lib/excelExport.ts - Full updated file
+import { Booking, ServicePackage, TeamMember, FinancialEntry } from './types';
 
 export interface MonthlyReportData {
   bookings: Booking[];
@@ -25,6 +25,14 @@ interface CategoryStats {
   [category: string]: number;
 }
 
+interface FinancialStats {
+  totalRevenue: number;
+  totalExpenses: number;
+  netProfit: number;
+  profitMargin: number;
+  analyzedBookings: number;
+}
+
 export async function generateMonthlyExcelReport(data: MonthlyReportData): Promise<Blob> {
   const { bookings, packages, month, year } = data;
   
@@ -33,6 +41,7 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
   const staffStats = calculateStaffStats(bookings, packages);
   const categoryStats = calculateCategoryStats(bookings);
   const totalIncome = calculateTotalIncome(bookings, packages);
+  const financialStats = calculateFinancialStats(bookings);
 
   // Create Excel workbook structure
   const XLSX = await import('xlsx');
@@ -56,12 +65,16 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
     'Category Breakdown'
   );
   XLSX.utils.book_append_sheet(workbook, 
-    XLSX.utils.aoa_to_sheet(generateFinancialSummarySheet(totalIncome, month, year)), 
+    XLSX.utils.aoa_to_sheet(generateFinancialSummarySheet(totalIncome, month, year, financialStats)), 
     'Financial Summary'
   );
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateStaffRevenueSheet(staffStats)), 
     'Staff Revenue'
+  );
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet(generateFinancialBreakdownSheet(bookings)), 
+    'Financial Breakdown'
   );
 
   // Convert to Excel blob
@@ -163,6 +176,34 @@ function calculateTotalIncome(bookings: Booking[], packages: ServicePackage[]): 
   }, 0);
 }
 
+function calculateFinancialStats(bookings: Booking[]): FinancialStats {
+  const bookingsWithFinancial = bookings.filter(b => b.financial_entry);
+  
+  const totalRevenue = bookingsWithFinancial.reduce((sum, booking) => 
+    sum + (booking.financial_entry!.package_amount || 0), 0);
+  
+  const totalExpenses = bookingsWithFinancial.reduce((sum, booking) => {
+    const financial = booking.financial_entry!;
+    return sum + 
+      (financial.photographer_expenses || 0) +
+      (financial.videographer_expenses || 0) +
+      (financial.editor_expenses || 0) +
+      (financial.company_expenses || 0) +
+      (financial.other_expenses || 0);
+  }, 0);
+
+  const netProfit = totalRevenue - totalExpenses;
+  const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+  return {
+    totalRevenue,
+    totalExpenses,
+    netProfit,
+    profitMargin,
+    analyzedBookings: bookingsWithFinancial.length
+  };
+}
+
 // Update the booking details sheet
 function generateBookingDetailsSheet(bookings: Booking[], packages: ServicePackage[]): (string | number)[][] {
   const headers = [
@@ -232,8 +273,70 @@ function generateStaffRevenueSheet(staffStats: StaffStats): (string | number)[][
       `Rs. ${stats.revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       stats.count > 0 ? `Rs. ${(stats.revenue / stats.count).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Rs. 0.00'
     ])
-    .sort((a, b) => (b[2] as string).localeCompare(a[2] as string)); // Sort by revenue descending
+    .sort((a, b) => {
+      // Sort by revenue descending
+      const revenueA = parseFloat((a[2] as string).replace(/[^\d.]/g, ''));
+      const revenueB = parseFloat((b[2] as string).replace(/[^\d.]/g, ''));
+      return revenueB - revenueA;
+    });
   
+  return [headers, ...data];
+}
+
+// lib/excelExport.ts - Update the generateFinancialBreakdownSheet function
+function generateFinancialBreakdownSheet(bookings: Booking[]): (string | number)[][] {
+  const headers = [
+    'Inquiry ID', 'Client Name', 'Package Category', 'Package Name', 
+    'Package Amount', 'Photographer Expenses', 'Videographer Expenses', 
+    'Editor Expenses', 'Company Expenses', 'Other Expenses', 'Total Expenses',
+    'Net Profit', 'Profit Margin %'
+  ];
+  
+  const bookingsWithFinancial = bookings.filter(booking => booking.financial_entry);
+  const data = bookingsWithFinancial.map(booking => {
+    const financial = booking.financial_entry!;
+    const totalExpenses = 
+      (financial.photographer_expenses || 0) +
+      (financial.videographer_expenses || 0) +
+      (financial.editor_expenses || 0) +
+      (financial.company_expenses || 0) +
+      (financial.other_expenses || 0);
+    
+    const netProfit = (financial.package_amount || 0) - totalExpenses;
+    const profitMargin = financial.package_amount ? (netProfit / financial.package_amount) * 100 : 0;
+
+    return [
+      booking.inquiry_id || 'N/A',
+      booking.full_name,
+      financial.package_category || 'N/A',
+      financial.package_name || 'N/A',
+      financial.package_amount ? `Rs. ${financial.package_amount.toLocaleString()}` : 'Rs. 0',
+      financial.photographer_expenses ? `Rs. ${financial.photographer_expenses.toLocaleString()}` : 'Rs. 0',
+      financial.videographer_expenses ? `Rs. ${financial.videographer_expenses.toLocaleString()}` : 'Rs. 0',
+      financial.editor_expenses ? `Rs. ${financial.editor_expenses.toLocaleString()}` : 'Rs. 0',
+      financial.company_expenses ? `Rs. ${financial.company_expenses.toLocaleString()}` : 'Rs. 0',
+      financial.other_expenses ? `Rs. ${financial.other_expenses.toLocaleString()}` : 'Rs. 0',
+      `Rs. ${totalExpenses.toLocaleString()}`,
+      `Rs. ${netProfit.toLocaleString()}`,
+      `${profitMargin.toFixed(1)}%`
+    ];
+  });
+
+  // Add summary row if there are financial entries
+  if (data.length > 0) {
+    const financialStats = calculateFinancialStats(bookings);
+    data.push(
+      [''],
+      ['SUMMARY', '', '', '', 
+       `Rs. ${financialStats.totalRevenue.toLocaleString()}`, 
+       '', '', '', '', '',
+       `Rs. ${financialStats.totalExpenses.toLocaleString()}`,
+       `Rs. ${financialStats.netProfit.toLocaleString()}`,
+       `${financialStats.profitMargin.toFixed(1)}%`
+      ]
+    );
+  }
+
   return [headers, ...data];
 }
 
@@ -247,17 +350,39 @@ function generateCategoryBreakdownSheet(categoryStats: CategoryStats): (string |
   return [headers, ...data];
 }
 
-function generateFinancialSummarySheet(totalIncome: number, month: string, year: string): (string | number)[][] {
-  return [
+function generateFinancialSummarySheet(totalIncome: number, month: string, year: string, financialStats?: FinancialStats): (string | number)[][] {
+  const sheets = [
     ['Monthly Financial Summary'],
     [''],
     ['Report Period:', `${getMonthName(parseInt(month))} ${year}`],
     ['Total Bookings:', totalIncome > 0 ? 'See Analytics Sheets' : '0'],
     ['Total Estimated Revenue:', `Rs. ${totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+  ];
+
+  if (financialStats && financialStats.analyzedBookings > 0) {
+    sheets.push(
+      [''],
+      ['Financial Analysis (Completed Entries):'],
+      ['Bookings with Financial Data:', `${financialStats.analyzedBookings}`],
+      ['Total Revenue (Analyzed):', `Rs. ${financialStats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+      ['Total Expenses (Analyzed):', `Rs. ${financialStats.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+      ['Net Profit (Analyzed):', `Rs. ${financialStats.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+      ['Profit Margin (Analyzed):', `${financialStats.profitMargin.toFixed(1)}%`]
+    );
+  } else if (financialStats) {
+    sheets.push(
+      [''],
+      ['Financial Analysis:', 'No completed financial entries found']
+    );
+  }
+
+  sheets.push(
     [''],
     ['Generated on:', new Date().toLocaleDateString()],
     ['Generated by:', 'Studio Management System']
-  ];
+  );
+
+  return sheets;
 }
 
 function getMonthName(month: number): string {

@@ -2,24 +2,27 @@
 "use client";
 
 import { useState } from "react";
-import { Booking } from "@/lib/types";
+import { Booking, ServicePackage } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Mail, Calendar, User, Package, Building, Phone, Camera } from "lucide-react";
+import { Edit, Mail, Calendar, User, Package, Building, Phone, Camera, DollarSign } from "lucide-react";
 import { UpdateBookingStatus } from "./UpdateBookingStatus";
 import { AssignPhotographers } from "./AssignPhotographers";
 import { DeleteBookingButton } from "./DeleteBookingButton";
 import { EditBookingDialog } from "./EditBookingDialog";
+import { FinancialDialog } from "./FinancialDialog";
 
 interface BookingCardProps {
   booking: Booking;
   userRole: string;
   availableStaff: { id: string; full_name: string }[];
+  packages?: ServicePackage[];
 }
 
-export function BookingCard({ booking, userRole, availableStaff }: BookingCardProps) {
+export function BookingCard({ booking, userRole, availableStaff, packages }: BookingCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not specified";
@@ -121,6 +124,17 @@ export function BookingCard({ booking, userRole, availableStaff }: BookingCardPr
             </div>
           )}
 
+          {/* Financial Status */}
+          {booking.financial_entry && (
+            <div className="flex items-center gap-2 text-sm">
+              <DollarSign className="h-4 w-4 text-green-600" />
+              <span className="text-muted-foreground">Financial:</span>
+              <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                Completed
+              </Badge>
+            </div>
+          )}
+
           {/* Assigned Photographers */}
           {booking.assigned_photographers &&
             booking.assigned_photographers.length > 0 && (
@@ -158,6 +172,14 @@ export function BookingCard({ booking, userRole, availableStaff }: BookingCardPr
                   <Edit className="h-3 w-3 mr-1" />
                   Edit
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsFinancialDialogOpen(true)}
+                >
+                  <DollarSign className="h-3 w-3 mr-1" />
+                  Financial
+                </Button>
                 <AssignPhotographers
                   bookingId={booking.id}
                   currentAssignments={booking.assigned_photographers || []}
@@ -180,6 +202,16 @@ export function BookingCard({ booking, userRole, availableStaff }: BookingCardPr
           booking={booking}
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
+        />
+      )}
+
+      {/* Financial Dialog */}
+      {userRole === "management" && (
+        <FinancialDialog
+          booking={booking}
+          open={isFinancialDialogOpen}
+          onOpenChange={setIsFinancialDialogOpen}
+          packages={packages}
         />
       )}
     </>

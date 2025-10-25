@@ -4,8 +4,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { Booking, ServicePackage, TeamMember } from '@/lib/types';
 
-// actions.ts - Only showing the updated generateMonthlyReport function
+// --- generateMonthlyReport function ---
 export async function generateMonthlyReport(month: string, year: string) {
   const cookieStore = await cookies();
 
@@ -66,10 +67,30 @@ export async function generateMonthlyReport(month: string, year: string) {
 
     if (membersError) throw membersError;
 
-    // Generate Excel report
+    // ✅ CRITICAL FIX: Fetch financial entries for these bookings
+    let bookingsWithFinancial: Booking[] = [];
+    if (bookings && bookings.length > 0) {
+      const bookingIds = bookings.map(b => b.id);
+      const { data: financialEntries, error: financialError } = await supabase
+        .from('financial_entries')
+        .select('*')
+        .in('booking_id', bookingIds);
+
+      if (!financialError && financialEntries) {
+        // Map financial entries to bookings
+        bookingsWithFinancial = bookings.map(booking => ({
+          ...booking,
+          financial_entry: financialEntries.find(fe => fe.booking_id === booking.id) || null
+        })) as Booking[];
+      } else {
+        bookingsWithFinancial = bookings as Booking[];
+      }
+    }
+
+    // Generate Excel report with the updated bookings data
     const { generateMonthlyExcelReport } = await import('@/lib/excelExport');
     const excelBlob = await generateMonthlyExcelReport({
-      bookings: bookings || [],
+      bookings: bookingsWithFinancial || [],
       packages: packages || [],
       teamMembers: teamMembers || [],
       month,
@@ -266,6 +287,125 @@ export async function deleteBooking(bookingId: number) {
   // Revalidate the path to refresh data on the admin page
   revalidatePath('/admin/bookings');
   return { success: true };
+}
+
+// --- updateFinancialEntry function ---
+export async function updateFinancialEntry(
+  bookingId: number,
+  financialData: {
+    package_category?: string;
+    package_name?: string;
+    package_amount?: number;
+    photographer_expenses?: number;
+    videographer_expenses?: number;
+    editor_expenses?: number;
+    company_expenses?: number;
+    other_expenses?: number;
+    final_amount?: number;
+  }
+) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can update financial data." };
+  }
+
+  try {
+    // Check if financial entry already exists
+    const { data: existingEntry } = await supabase
+      .from('financial_entries')
+      .select('id')
+      .eq('booking_id', bookingId)
+      .single();
+
+    let result;
+    
+    if (existingEntry) {
+      // Update existing entry
+      result = await supabase
+        .from('financial_entries')
+        .update(financialData)
+        .eq('booking_id', bookingId);
+    } else {
+      // Create new entry
+      result = await supabase
+        .from('financial_entries')
+        .insert([{ booking_id: bookingId, ...financialData }]);
+    }
+
+    if (result.error) {
+      console.error("Error updating financial entry:", result.error);
+      return { error: result.error.message };
+    }
+
+    // Revalidate the path to refresh data
+    revalidatePath('/admin/bookings');
+    return { success: true };
+
+  } catch (error) {
+    console.error("Error in updateFinancialEntry:", error);
+    return { error: "Failed to update financial data" };
+  }
+}
+
+// --- getFinancialEntries function ---
+export async function getFinancialEntries(bookingIds: number[]) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  const { data: financialEntries, error } = await supabase
+    .from('financial_entries')
+    .select('*')
+    .in('booking_id', bookingIds);
+
+  if (error) {
+    console.error("Error fetching financial entries:", error);
+    return { error: error.message };
+  }
+
+  return { financialEntries };
 }
 
 // --- getBookingStats function (Optional: For dashboard) ---

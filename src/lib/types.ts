@@ -74,7 +74,23 @@ export type Profile = {
   role: string; // Should be 'management' or 'worker'
 };
 
+// types.ts - Make sure FinancialEntry has all required fields
+export type FinancialEntry = {
+  id: number;
+  created_at: string;
+  booking_id: number;
+  package_category: string | null;
+  package_name: string | null;
+  package_amount: number | null;
+  photographer_expenses: number | null;
+  videographer_expenses: number | null;
+  editor_expenses: number | null;
+  company_expenses: number | null;
+  other_expenses: number | null;
+  final_amount: number | null;
+};
 
+// Update Booking type to include financial_entry
 export type Booking = {
   id: number;
   created_at: string;
@@ -89,4 +105,5 @@ export type Booking = {
   status: string | null;
   assigned_photographers: string[] | null;
   inquiry_id: string | null;
+  financial_entry?: FinancialEntry | null;
 };

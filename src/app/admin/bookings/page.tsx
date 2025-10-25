@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BookingCard } from "@/components/ui/BookingCard";
 import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
-import { Booking, Profile, TeamMember } from "@/lib/types";
+import { Booking, Profile, TeamMember, ServicePackage } from "@/lib/types";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
@@ -97,6 +97,16 @@ export default async function AdminBookingsPage() {
   const userRole = profile.role ?? "staff";
   const userName = profile.full_name || session.user.email || "Unknown User";
 
+  // --- Fetch Packages ---
+  let packages: ServicePackage[] = [];
+  const { data: packagesData, error: packagesError } = await supabase
+    .from("services")
+    .select("*");
+
+  if (!packagesError && packagesData) {
+    packages = packagesData as ServicePackage[];
+  }
+
   // --- Fetch Bookings ---
   let bookings: Booking[] = [];
   let fetchError: string | null = null;
@@ -111,6 +121,23 @@ export default async function AdminBookingsPage() {
     console.error("Error fetching bookings:", bookingError);
   } else if (bookingData) {
     bookings = bookingData as Booking[];
+
+    // Fetch financial entries for these bookings
+    const bookingIds = bookings.map(b => b.id);
+    if (bookingIds.length > 0) {
+      const { data: financialEntries, error: financialError } = await supabase
+        .from('financial_entries')
+        .select('*')
+        .in('booking_id', bookingIds);
+
+      if (!financialError && financialEntries) {
+        // Map financial entries to bookings
+        bookings = bookings.map(booking => ({
+          ...booking,
+          financial_entry: financialEntries.find(fe => fe.booking_id === booking.id) || null
+        }));
+      }
+    }
   }
 
   // --- Fetch Available Staff ---
@@ -193,6 +220,7 @@ export default async function AdminBookingsPage() {
                   booking={booking}
                   userRole={userRole}
                   availableStaff={availableStaff}
+                  packages={packages}
                 />
               ))}
             </div>
