@@ -1,5 +1,5 @@
 // lib/excelExport.ts - Full updated file
-import { Booking, ServicePackage, TeamMember, FinancialEntry } from './types';
+import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail } from './types';
 
 export interface MonthlyReportData {
   bookings: Booking[];
@@ -75,6 +75,10 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateFinancialBreakdownSheet(bookings)), 
     'Financial Breakdown'
+  );
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet(generatePhotographerEarningsSheet(bookings)), 
+    'Photographer Earnings'
   );
 
   // Convert to Excel blob
@@ -283,7 +287,87 @@ function generateStaffRevenueSheet(staffStats: StaffStats): (string | number)[][
   return [headers, ...data];
 }
 
-// lib/excelExport.ts - Update the generateFinancialBreakdownSheet function
+// NEW: Generate Photographer Earnings Sheet
+function generatePhotographerEarningsSheet(bookings: Booking[]): (string | number)[][] {
+  const headers = [
+    'Staff Member', 
+    'Total Events', 
+    'Total Earnings', 
+    'Average Per Event',
+    'Assigned Bookings (Inquiry IDs)'
+  ];
+  
+  // Calculate photographer earnings across all bookings
+  const photographerEarnings: { [key: string]: { 
+    events: number; 
+    totalEarnings: number; 
+    bookings: string[] 
+  } } = {};
+
+  bookings.forEach(booking => {
+    if (booking.financial_entry?.photographer_details) {
+      booking.financial_entry.photographer_details.forEach(detail => {
+        if (!photographerEarnings[detail.staff_name]) {
+          photographerEarnings[detail.staff_name] = {
+            events: 0,
+            totalEarnings: 0,
+            bookings: []
+          };
+        }
+        
+        photographerEarnings[detail.staff_name].events += 1;
+        photographerEarnings[detail.staff_name].totalEarnings += detail.amount;
+        if (booking.inquiry_id) {
+          photographerEarnings[detail.staff_name].bookings.push(booking.inquiry_id);
+        }
+      });
+    }
+  });
+
+  // If no photographer details found, show message
+  if (Object.keys(photographerEarnings).length === 0) {
+    return [
+      ['Photographer Earnings'],
+      [''],
+      ['No photographer financial data available for this period.'],
+      ['Financial details need to be entered in the Financial Dialog for each booking.']
+    ];
+  }
+
+  const data = Object.entries(photographerEarnings)
+    .map(([staffName, stats]) => [
+      staffName,
+      stats.events,
+      `Rs. ${stats.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Rs. ${(stats.totalEarnings / stats.events).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      stats.bookings.join(', ')
+    ])
+    .sort((a, b) => {
+      // Sort by total earnings descending
+      const earningsA = parseFloat((a[2] as string).replace(/[^\d.]/g, ''));
+      const earningsB = parseFloat((b[2] as string).replace(/[^\d.]/g, ''));
+      return earningsB - earningsA;
+    });
+
+  // Add summary row
+  const totalEvents = Object.values(photographerEarnings).reduce((sum, stats) => sum + stats.events, 0);
+  const totalEarnings = Object.values(photographerEarnings).reduce((sum, stats) => sum + stats.totalEarnings, 0);
+  const averageEarnings = totalEvents > 0 ? totalEarnings / totalEvents : 0;
+
+  data.push(
+    [''],
+    ['SUMMARY', 
+     totalEvents, 
+     `Rs. ${totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+     `Rs. ${averageEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+     `Total Photographers: ${Object.keys(photographerEarnings).length}`
+    ]
+  );
+
+  return [headers, ...data];
+}
+
+// Financial Breakdown Sheet
 function generateFinancialBreakdownSheet(bookings: Booking[]): (string | number)[][] {
   const headers = [
     'Inquiry ID', 'Client Name', 'Package Category', 'Package Name', 
@@ -293,6 +377,17 @@ function generateFinancialBreakdownSheet(bookings: Booking[]): (string | number)
   ];
   
   const bookingsWithFinancial = bookings.filter(booking => booking.financial_entry);
+  
+  // If no financial entries, show message
+  if (bookingsWithFinancial.length === 0) {
+    return [
+      ['Financial Breakdown'],
+      [''],
+      ['No financial data available for this period.'],
+      ['Financial details need to be entered in the Financial Dialog for each booking.']
+    ];
+  }
+
   const data = bookingsWithFinancial.map(booking => {
     const financial = booking.financial_entry!;
     const totalExpenses = 
@@ -322,20 +417,18 @@ function generateFinancialBreakdownSheet(bookings: Booking[]): (string | number)
     ];
   });
 
-  // Add summary row if there are financial entries
-  if (data.length > 0) {
-    const financialStats = calculateFinancialStats(bookings);
-    data.push(
-      [''],
-      ['SUMMARY', '', '', '', 
-       `Rs. ${financialStats.totalRevenue.toLocaleString()}`, 
-       '', '', '', '', '',
-       `Rs. ${financialStats.totalExpenses.toLocaleString()}`,
-       `Rs. ${financialStats.netProfit.toLocaleString()}`,
-       `${financialStats.profitMargin.toFixed(1)}%`
-      ]
-    );
-  }
+  // Add summary row
+  const financialStats = calculateFinancialStats(bookings);
+  data.push(
+    [''],
+    ['SUMMARY', '', '', '', 
+     `Rs. ${financialStats.totalRevenue.toLocaleString()}`, 
+     '', '', '', '', '',
+     `Rs. ${financialStats.totalExpenses.toLocaleString()}`,
+     `Rs. ${financialStats.netProfit.toLocaleString()}`,
+     `${financialStats.profitMargin.toFixed(1)}%`
+    ]
+  );
 
   return [headers, ...data];
 }
@@ -376,6 +469,18 @@ function generateFinancialSummarySheet(totalIncome: number, month: string, year:
     );
   }
 
+  // Add photographer earnings summary if available
+  const photographerEarnings = calculatePhotographerEarningsSummary(financialStats?.analyzedBookings || 0);
+  if (photographerEarnings.totalEarnings > 0) {
+    sheets.push(
+      [''],
+      ['Photographer Payments Summary:'],
+      ['Total Paid to Photographers:', `Rs. ${photographerEarnings.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+      ['Average per Photographer:', `Rs. ${photographerEarnings.averagePerPhotographer.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+      ['Percentage of Revenue:', `${photographerEarnings.percentageOfRevenue.toFixed(1)}%`]
+    );
+  }
+
   sheets.push(
     [''],
     ['Generated on:', new Date().toLocaleDateString()],
@@ -383,6 +488,22 @@ function generateFinancialSummarySheet(totalIncome: number, month: string, year:
   );
 
   return sheets;
+}
+
+// Helper function to calculate photographer earnings summary
+function calculatePhotographerEarningsSummary(analyzedBookings: number): { 
+  totalEarnings: number; 
+  averagePerPhotographer: number; 
+  percentageOfRevenue: number 
+} {
+  // This would typically come from the actual data
+  // For now, we'll return placeholder values
+  // In a real implementation, this would aggregate from photographer_financial_details
+  return {
+    totalEarnings: 0,
+    averagePerPhotographer: 0,
+    percentageOfRevenue: 0
+  };
 }
 
 function getMonthName(month: number): string {

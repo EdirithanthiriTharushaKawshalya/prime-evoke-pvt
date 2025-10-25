@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BookingCard } from "@/components/ui/BookingCard";
 import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
-import { Booking, Profile, TeamMember, ServicePackage } from "@/lib/types";
+import { Booking, Profile, TeamMember, ServicePackage, FinancialEntry, PhotographerFinancialDetail } from "@/lib/types";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
@@ -131,11 +131,39 @@ export default async function AdminBookingsPage() {
         .in('booking_id', bookingIds);
 
       if (!financialError && financialEntries) {
-        // Map financial entries to bookings
+        // ✅ NEW: Fetch photographer financial details for these bookings
+        const { data: photographerDetails, error: photographerError } = await supabase
+          .from('photographer_financial_details')
+          .select('*')
+          .in('booking_id', bookingIds);
+
+        if (!photographerError && photographerDetails) {
+          // Map financial entries and photographer details to bookings
+          bookings = bookings.map(booking => {
+            const financialEntry = financialEntries.find(fe => fe.booking_id === booking.id);
+            const photographerDetailsForBooking = photographerDetails.filter(pd => pd.booking_id === booking.id);
+            
+            return {
+              ...booking,
+              financial_entry: financialEntry ? {
+                ...financialEntry,
+                photographer_details: photographerDetailsForBooking
+              } : null
+            };
+          }) as Booking[];
+        } else {
+          // Map only financial entries if photographer details not available
+          bookings = bookings.map(booking => ({
+            ...booking,
+            financial_entry: financialEntries.find(fe => fe.booking_id === booking.id) || null
+          })) as Booking[];
+        }
+      } else {
+        // No financial entries found, set all to null
         bookings = bookings.map(booking => ({
           ...booking,
-          financial_entry: financialEntries.find(fe => fe.booking_id === booking.id) || null
-        }));
+          financial_entry: null
+        })) as Booking[];
       }
     }
   }
@@ -197,6 +225,7 @@ export default async function AdminBookingsPage() {
             <LogoutButton />
           </div>
         </div>
+
         <p className="mb-8 text-muted-foreground">
           Viewing as: {userRole} ({userName})
         </p>
@@ -206,12 +235,22 @@ export default async function AdminBookingsPage() {
             Error loading bookings: {fetchError}
           </p>
         )}
-        {!fetchError && bookings.length === 0 && <p>No bookings found.</p>}
+        {!fetchError && bookings.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-muted-foreground text-lg">No bookings found.</div>
+            <p className="text-sm text-muted-foreground mt-2">
+              When clients submit inquiries through your studio websites, they will appear here.
+            </p>
+          </div>
+        )}
 
         {sortedMonths.map((monthYear) => (
           <div key={monthYear} className="mb-12">
             <h2 className="text-2xl font-semibold mb-6 border-b pb-2">
               {monthYear}
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                ({groupedBookings[monthYear].length} bookings)
+              </span>
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {groupedBookings[monthYear].map((booking) => (

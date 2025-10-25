@@ -88,6 +88,7 @@ export type FinancialEntry = {
   company_expenses: number | null;
   other_expenses: number | null;
   final_amount: number | null;
+  photographer_details?: PhotographerFinancialDetail[];
 };
 
 // Update Booking type to include financial_entry
@@ -107,3 +108,13 @@ export type Booking = {
   inquiry_id: string | null;
   financial_entry?: FinancialEntry | null;
 };
+
+// types.ts - Add new type
+export type PhotographerFinancialDetail = {
+    id: number;
+    created_at: string;
+    booking_id: number;
+    staff_name: string;
+    amount: number;
+};
+

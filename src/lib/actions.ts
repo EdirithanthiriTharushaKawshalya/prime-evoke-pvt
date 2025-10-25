@@ -4,7 +4,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { Booking, ServicePackage, TeamMember } from '@/lib/types';
+import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail } from '@/lib/types';
 
 // --- generateMonthlyReport function ---
 export async function generateMonthlyReport(month: string, year: string) {
@@ -82,6 +82,23 @@ export async function generateMonthlyReport(month: string, year: string) {
           ...booking,
           financial_entry: financialEntries.find(fe => fe.booking_id === booking.id) || null
         })) as Booking[];
+
+        // ✅ NEW: Fetch photographer financial details for these bookings
+        const { data: photographerDetails, error: photographerError } = await supabase
+          .from('photographer_financial_details')
+          .select('*')
+          .in('booking_id', bookingIds);
+
+        if (!photographerError && photographerDetails) {
+          // Map photographer details to bookings
+          bookingsWithFinancial = bookingsWithFinancial.map(booking => ({
+            ...booking,
+            financial_entry: booking.financial_entry ? {
+              ...booking.financial_entry,
+              photographer_details: photographerDetails.filter(detail => detail.booking_id === booking.id)
+            } : null
+          })) as Booking[];
+        }
       } else {
         bookingsWithFinancial = bookings as Booking[];
       }
@@ -379,6 +396,88 @@ export async function updateFinancialEntry(
   }
 }
 
+// --- NEW: updatePhotographerFinancialDetails function ---
+export async function updatePhotographerFinancialDetails(
+  bookingId: number,
+  photographerDetails: PhotographerFinancialDetail[]
+) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can update financial data." };
+  }
+
+  try {
+    // Delete existing photographer details for this booking
+    const { error: deleteError } = await supabase
+      .from('photographer_financial_details')
+      .delete()
+      .eq('booking_id', bookingId);
+
+    if (deleteError) {
+      console.error("Error deleting old photographer details:", deleteError);
+      return { error: deleteError.message };
+    }
+
+    // Insert new photographer details (only those with amount > 0)
+    const detailsToInsert = photographerDetails.filter(detail => detail.amount > 0);
+    
+    if (detailsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('photographer_financial_details')
+        .insert(detailsToInsert.map(detail => ({
+          booking_id: bookingId,
+          staff_name: detail.staff_name,
+          amount: detail.amount
+        })));
+
+      if (insertError) {
+        console.error("Error inserting photographer details:", insertError);
+        return { error: insertError.message };
+      }
+    }
+
+    // Revalidate the path to refresh data
+    revalidatePath('/admin/bookings');
+    return { success: true };
+
+  } catch (error) {
+    console.error("Error in updatePhotographerFinancialDetails:", error);
+    return { error: "Failed to update photographer financial details" };
+  }
+}
+
 // --- getFinancialEntries function ---
 export async function getFinancialEntries(bookingIds: number[]) {
   const cookieStore = await cookies();
@@ -403,6 +502,24 @@ export async function getFinancialEntries(bookingIds: number[]) {
   if (error) {
     console.error("Error fetching financial entries:", error);
     return { error: error.message };
+  }
+
+  // ✅ NEW: Fetch photographer details for these bookings
+  if (financialEntries && financialEntries.length > 0) {
+    const { data: photographerDetails, error: photographerError } = await supabase
+      .from('photographer_financial_details')
+      .select('*')
+      .in('booking_id', bookingIds);
+
+    if (!photographerError && photographerDetails) {
+      // Map photographer details to financial entries
+      const entriesWithDetails = financialEntries.map(entry => ({
+        ...entry,
+        photographer_details: photographerDetails.filter(detail => detail.booking_id === entry.booking_id)
+      }));
+
+      return { financialEntries: entriesWithDetails };
+    }
   }
 
   return { financialEntries };
@@ -573,4 +690,109 @@ export async function updateBooking(
   // Revalidate the path to refresh data on the admin page
   revalidatePath('/admin/bookings');
   return { success: true };
+}
+
+// --- NEW: getPhotographerMonthlyEarnings function ---
+export async function getPhotographerMonthlyEarnings(month: string, year: string) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Only management can access earnings data
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !session) {
+    return { error: "Not authenticated" };
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can access earnings data." };
+  }
+
+  try {
+    // Calculate date range for the month
+    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1).toISOString();
+    const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59).toISOString();
+
+    // Fetch bookings for the specific month
+    const { data: bookings, error: bookingsError } = await supabase
+      .from('client_bookings')
+      .select('id, inquiry_id, event_date')
+      .gte('event_date', startDate.split('T')[0])
+      .lte('event_date', endDate.split('T')[0]);
+
+    if (bookingsError) throw bookingsError;
+
+    if (!bookings || bookings.length === 0) {
+      return { earnings: [] };
+    }
+
+    const bookingIds = bookings.map(b => b.id);
+
+    // Fetch photographer financial details for these bookings
+    const { data: photographerDetails, error: photographerError } = await supabase
+      .from('photographer_financial_details')
+      .select('*')
+      .in('booking_id', bookingIds);
+
+    if (photographerError) throw photographerError;
+
+    // Calculate earnings by photographer
+    const earningsByPhotographer: { [key: string]: { 
+      totalEarnings: number; 
+      eventCount: number;
+      events: Array<{ inquiry_id: string; event_date: string; amount: number }>
+    } } = {};
+
+    photographerDetails?.forEach(detail => {
+      const booking = bookings.find(b => b.id === detail.booking_id);
+      if (!earningsByPhotographer[detail.staff_name]) {
+        earningsByPhotographer[detail.staff_name] = {
+          totalEarnings: 0,
+          eventCount: 0,
+          events: []
+        };
+      }
+      
+      earningsByPhotographer[detail.staff_name].totalEarnings += detail.amount;
+      earningsByPhotographer[detail.staff_name].eventCount += 1;
+      earningsByPhotographer[detail.staff_name].events.push({
+        inquiry_id: booking?.inquiry_id || 'Unknown',
+        event_date: booking?.event_date || 'Unknown',
+        amount: detail.amount
+      });
+    });
+
+    // Convert to array and sort by total earnings
+    const earnings = Object.entries(earningsByPhotographer)
+      .map(([staffName, data]) => ({
+        staffName,
+        totalEarnings: data.totalEarnings,
+        eventCount: data.eventCount,
+        averageEarnings: data.eventCount > 0 ? data.totalEarnings / data.eventCount : 0,
+        events: data.events
+      }))
+      .sort((a, b) => b.totalEarnings - a.totalEarnings);
+
+    return { earnings };
+
+  } catch (error) {
+    console.error("Error fetching photographer earnings:", error);
+    return { error: "Failed to fetch photographer earnings" };
+  }
 }
