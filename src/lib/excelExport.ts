@@ -47,7 +47,7 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
   const XLSX = await import('xlsx');
   const workbook = XLSX.utils.book_new();
 
-  // Add sheets to workbook
+  // Add sheets to workbook (removed Staff Revenue sheet)
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateBookingDetailsSheet(bookings, packages)), 
     'Booking Details'
@@ -65,12 +65,8 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
     'Category Breakdown'
   );
   XLSX.utils.book_append_sheet(workbook, 
-    XLSX.utils.aoa_to_sheet(generateFinancialSummarySheet(totalIncome, month, year, financialStats)), 
+    XLSX.utils.aoa_to_sheet(generateFinancialSummarySheet(totalIncome, month, year)), 
     'Financial Summary'
-  );
-  XLSX.utils.book_append_sheet(workbook, 
-    XLSX.utils.aoa_to_sheet(generateStaffRevenueSheet(staffStats)), 
-    'Staff Revenue'
   );
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateFinancialBreakdownSheet(bookings)), 
@@ -266,34 +262,14 @@ function generateStaffPerformanceSheet(staffStats: StaffStats): (string | number
   return [headers, ...data];
 }
 
-function generateStaffRevenueSheet(staffStats: StaffStats): (string | number)[][] {
-  const headers = ['Staff Member', 'Events Worked', 'Total Revenue Contribution', 'Average Revenue Per Event'];
-  
-  const data = Object.entries(staffStats)
-    .filter(([staffName]) => staffName !== 'Unassigned') // Exclude unassigned from revenue calculations
-    .map(([staffName, stats]) => [
-      staffName,
-      stats.count,
-      `Rs. ${stats.revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      stats.count > 0 ? `Rs. ${(stats.revenue / stats.count).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Rs. 0.00'
-    ])
-    .sort((a, b) => {
-      // Sort by revenue descending
-      const revenueA = parseFloat((a[2] as string).replace(/[^\d.]/g, ''));
-      const revenueB = parseFloat((b[2] as string).replace(/[^\d.]/g, ''));
-      return revenueB - revenueA;
-    });
-  
-  return [headers, ...data];
-}
+// REMOVED: generateStaffRevenueSheet function completely
 
-// NEW: Generate Photographer Earnings Sheet
+// NEW: Generate Photographer Earnings Sheet (without Average Per Event column)
 function generatePhotographerEarningsSheet(bookings: Booking[]): (string | number)[][] {
   const headers = [
     'Staff Member', 
     'Total Events', 
-    'Total Earnings', 
-    'Average Per Event',
+    'Total Earnings',
     'Assigned Bookings (Inquiry IDs)'
   ];
   
@@ -339,7 +315,6 @@ function generatePhotographerEarningsSheet(bookings: Booking[]): (string | numbe
       staffName,
       stats.events,
       `Rs. ${stats.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      `Rs. ${(stats.totalEarnings / stats.events).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       stats.bookings.join(', ')
     ])
     .sort((a, b) => {
@@ -352,14 +327,12 @@ function generatePhotographerEarningsSheet(bookings: Booking[]): (string | numbe
   // Add summary row
   const totalEvents = Object.values(photographerEarnings).reduce((sum, stats) => sum + stats.events, 0);
   const totalEarnings = Object.values(photographerEarnings).reduce((sum, stats) => sum + stats.totalEarnings, 0);
-  const averageEarnings = totalEvents > 0 ? totalEarnings / totalEvents : 0;
 
   data.push(
     [''],
     ['SUMMARY', 
      totalEvents, 
      `Rs. ${totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-     `Rs. ${averageEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
      `Total Photographers: ${Object.keys(photographerEarnings).length}`
     ]
   );
@@ -367,13 +340,12 @@ function generatePhotographerEarningsSheet(bookings: Booking[]): (string | numbe
   return [headers, ...data];
 }
 
-// Financial Breakdown Sheet
+// Financial Breakdown Sheet (without Net Profit and Profit Margin columns)
 function generateFinancialBreakdownSheet(bookings: Booking[]): (string | number)[][] {
   const headers = [
     'Inquiry ID', 'Client Name', 'Package Category', 'Package Name', 
     'Package Amount', 'Photographer Expenses', 'Videographer Expenses', 
-    'Editor Expenses', 'Company Expenses', 'Other Expenses', 'Total Expenses',
-    'Net Profit', 'Profit Margin %'
+    'Editor Expenses', 'Company Expenses', 'Other Expenses', 'Total Expenses'
   ];
   
   const bookingsWithFinancial = bookings.filter(booking => booking.financial_entry);
@@ -396,9 +368,6 @@ function generateFinancialBreakdownSheet(bookings: Booking[]): (string | number)
       (financial.editor_expenses || 0) +
       (financial.company_expenses || 0) +
       (financial.other_expenses || 0);
-    
-    const netProfit = (financial.package_amount || 0) - totalExpenses;
-    const profitMargin = financial.package_amount ? (netProfit / financial.package_amount) * 100 : 0;
 
     return [
       booking.inquiry_id || 'N/A',
@@ -411,9 +380,7 @@ function generateFinancialBreakdownSheet(bookings: Booking[]): (string | number)
       financial.editor_expenses ? `Rs. ${financial.editor_expenses.toLocaleString()}` : 'Rs. 0',
       financial.company_expenses ? `Rs. ${financial.company_expenses.toLocaleString()}` : 'Rs. 0',
       financial.other_expenses ? `Rs. ${financial.other_expenses.toLocaleString()}` : 'Rs. 0',
-      `Rs. ${totalExpenses.toLocaleString()}`,
-      `Rs. ${netProfit.toLocaleString()}`,
-      `${profitMargin.toFixed(1)}%`
+      `Rs. ${totalExpenses.toLocaleString()}`
     ];
   });
 
@@ -424,9 +391,7 @@ function generateFinancialBreakdownSheet(bookings: Booking[]): (string | number)
     ['SUMMARY', '', '', '', 
      `Rs. ${financialStats.totalRevenue.toLocaleString()}`, 
      '', '', '', '', '',
-     `Rs. ${financialStats.totalExpenses.toLocaleString()}`,
-     `Rs. ${financialStats.netProfit.toLocaleString()}`,
-     `${financialStats.profitMargin.toFixed(1)}%`
+     `Rs. ${financialStats.totalExpenses.toLocaleString()}`
     ]
   );
 
@@ -443,43 +408,14 @@ function generateCategoryBreakdownSheet(categoryStats: CategoryStats): (string |
   return [headers, ...data];
 }
 
-function generateFinancialSummarySheet(totalIncome: number, month: string, year: string, financialStats?: FinancialStats): (string | number)[][] {
+// Financial Summary Sheet (removed booking count, total revenue, total expenses, net profit, profit margin rows)
+function generateFinancialSummarySheet(totalIncome: number, month: string, year: string): (string | number)[][] {
   const sheets = [
     ['Monthly Financial Summary'],
     [''],
     ['Report Period:', `${getMonthName(parseInt(month))} ${year}`],
-    ['Total Bookings:', totalIncome > 0 ? 'See Analytics Sheets' : '0'],
     ['Total Estimated Revenue:', `Rs. ${totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
   ];
-
-  if (financialStats && financialStats.analyzedBookings > 0) {
-    sheets.push(
-      [''],
-      ['Financial Analysis (Completed Entries):'],
-      ['Bookings with Financial Data:', `${financialStats.analyzedBookings}`],
-      ['Total Revenue (Analyzed):', `Rs. ${financialStats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-      ['Total Expenses (Analyzed):', `Rs. ${financialStats.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-      ['Net Profit (Analyzed):', `Rs. ${financialStats.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-      ['Profit Margin (Analyzed):', `${financialStats.profitMargin.toFixed(1)}%`]
-    );
-  } else if (financialStats) {
-    sheets.push(
-      [''],
-      ['Financial Analysis:', 'No completed financial entries found']
-    );
-  }
-
-  // Add photographer earnings summary if available
-  const photographerEarnings = calculatePhotographerEarningsSummary(financialStats?.analyzedBookings || 0);
-  if (photographerEarnings.totalEarnings > 0) {
-    sheets.push(
-      [''],
-      ['Photographer Payments Summary:'],
-      ['Total Paid to Photographers:', `Rs. ${photographerEarnings.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-      ['Average per Photographer:', `Rs. ${photographerEarnings.averagePerPhotographer.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-      ['Percentage of Revenue:', `${photographerEarnings.percentageOfRevenue.toFixed(1)}%`]
-    );
-  }
 
   sheets.push(
     [''],
@@ -488,22 +424,6 @@ function generateFinancialSummarySheet(totalIncome: number, month: string, year:
   );
 
   return sheets;
-}
-
-// Helper function to calculate photographer earnings summary
-function calculatePhotographerEarningsSummary(analyzedBookings: number): { 
-  totalEarnings: number; 
-  averagePerPhotographer: number; 
-  percentageOfRevenue: number 
-} {
-  // This would typically come from the actual data
-  // For now, we'll return placeholder values
-  // In a real implementation, this would aggregate from photographer_financial_details
-  return {
-    totalEarnings: 0,
-    averagePerPhotographer: 0,
-    percentageOfRevenue: 0
-  };
 }
 
 function getMonthName(month: number): string {
