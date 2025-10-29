@@ -23,8 +23,6 @@ interface UpdateProductOrderStatusProps {
 // Statuses and colors from your UpdateBookingStatus.tsx
 const statusOptions = [
   { value: "New", label: "New", color: "bg-blue-500" },
-  { value: "Contacted", label: "Contacted", color: "bg-yellow-500" },
-  { value: "Confirmed", label: "Confirmed", color: "bg-green-500" },
   { value: "Completed", label: "Completed", color: "bg-purple-500" },
   { value: "Cancelled", label: "Cancelled", color: "bg-red-500" },
 ];
