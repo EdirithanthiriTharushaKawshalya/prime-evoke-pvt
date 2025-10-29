@@ -1,5 +1,5 @@
 // lib/excelExport.ts - Full updated file
-import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail, ProductOrder, OrderedItem } from './types';
+import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail, ProductOrder, OrderedItem, ProductOrderFinancialEntry } from './types';
 
 export interface MonthlyReportData {
   bookings: Booking[];
@@ -48,15 +48,19 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
   const XLSX = await import('xlsx');
   const workbook = XLSX.utils.book_new();
 
-  // Add sheets to workbook (removed Staff Revenue sheet)
+  // Add sheets to workbook
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateBookingDetailsSheet(bookings, packages)), 
     'Booking Details'
   );
-  // NEW: Add Product Orders sheet
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateProductOrdersSheet(productOrders)), 
     'Product Orders'
+  );
+  // NEW: Add Product Financials sheet
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet(generateProductFinancialsSheet(productOrders)), 
+    'Product Financials'
   );
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generatePackageAnalyticsSheet(packageStats)), 
@@ -82,6 +86,12 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
     XLSX.utils.aoa_to_sheet(generatePhotographerEarningsSheet(bookings)), 
     'Photographer Earnings'
   );
+  // --- ADD THIS LINE ---
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet(generateSalarySheet(bookings, productOrders)), 
+    'Salary Sheet'
+  );
+  // --- END OF ADDITION ---
 
   // Convert to Excel blob
   const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
@@ -268,7 +278,7 @@ function generateStaffPerformanceSheet(staffStats: StaffStats): (string | number
   return [headers, ...data];
 }
 
-// NEW: Generate Photographer Earnings Sheet (without Average Per Event column)
+// Generate Photographer Earnings Sheet (without Average Per Event column)
 function generatePhotographerEarningsSheet(bookings: Booking[]): (string | number)[][] {
   const headers = [
     'Staff Member', 
@@ -434,7 +444,7 @@ function getMonthName(month: number): string {
   return new Date(2000, month - 1, 1).toLocaleString('default', { month: 'long' });
 }
 
-// --- NEW: generateProductOrdersSheet function ---
+// Generate Product Orders Sheet
 function generateProductOrdersSheet(productOrders: ProductOrder[]): (string | number)[][] {
   const headers = [
     'Order ID', 'Order Date', 'Customer Name', 'Customer Email', 'Customer Mobile', 
@@ -509,6 +519,156 @@ function generateProductOrdersSheet(productOrders: ProductOrder[]): (string | nu
       'SUMMARY', '', '', '', '', '', '', '', '', '', 
       'Total Revenue:', 
       `Rs. ${grandTotal.toLocaleString()}`
+    ]
+  );
+
+  return [headers, ...data];
+}
+
+// --- NEW: generateProductFinancialsSheet function ---
+function generateProductFinancialsSheet(productOrders: ProductOrder[]): (string | number)[][] {
+  const headers = [
+    'Order ID', 'Customer Name', 'Studio', 'Order Amount', 
+    'Photographer Commission', 'Studio Fee', 'Other Expenses', 'Profit',
+    'Assigned Staff', 'Staff 1', 'Amount 1', 'Staff 2', 'Amount 2'
+  ];
+  
+  const ordersWithFinancial = productOrders.filter(order => order.financial_entry);
+  
+  if (ordersWithFinancial.length === 0) {
+    return [
+      ['Product Order Financials'],
+      [''],
+      ['No financial data available for product orders in this period.'],
+      ['Financial details must be entered in the Financial Dialog for each order.']
+    ];
+  }
+
+  const data = ordersWithFinancial.map(order => {
+    const financial = order.financial_entry!;
+    const staff = financial.photographer_details || [];
+    
+    return [
+      order.order_id,
+      order.customer_name,
+      order.studio_slug,
+      `Rs. ${financial.order_amount?.toLocaleString() || 0}`,
+      `Rs. ${financial.photographer_commission_total?.toLocaleString() || 0}`,
+      `Rs. ${financial.studio_fee?.toLocaleString() || 0}`,
+      `Rs. ${financial.other_expenses?.toLocaleString() || 0}`,
+      `Rs. ${financial.profit?.toLocaleString() || 0}`,
+      order.assigned_photographers?.join(', ') || 'N/A',
+      staff[0]?.staff_name || '',
+      staff[0]?.amount ? `Rs. ${staff[0].amount.toLocaleString()}` : '',
+      staff[1]?.staff_name || '',
+      staff[1]?.amount ? `Rs. ${staff[1].amount.toLocaleString()}` : '',
+    ];
+  });
+
+  // Add summary row
+  const totalAmount = ordersWithFinancial.reduce((sum, o) => sum + (o.financial_entry?.order_amount || 0), 0);
+  const totalCommission = ordersWithFinancial.reduce((sum, o) => sum + (o.financial_entry?.photographer_commission_total || 0), 0);
+  const totalStudioFee = ordersWithFinancial.reduce((sum, o) => sum + (o.financial_entry?.studio_fee || 0), 0);
+  const totalOther = ordersWithFinancial.reduce((sum, o) => sum + (o.financial_entry?.other_expenses || 0), 0);
+  const totalProfit = ordersWithFinancial.reduce((sum, o) => sum + (o.financial_entry?.profit || 0), 0);
+
+  data.push(
+    [''],
+    [
+      'SUMMARY', '', '',
+      `Rs. ${totalAmount.toLocaleString()}`,
+      `Rs. ${totalCommission.toLocaleString()}`,
+      `Rs. ${totalStudioFee.toLocaleString()}`,
+      `Rs. ${totalOther.toLocaleString()}`,
+      `Rs. ${totalProfit.toLocaleString()}`,
+      '', '', '', ''
+    ]
+  );
+
+  return [headers, ...data];
+}
+
+// --- NEW: generateSalarySheet function ---
+function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[]): (string | number)[][] {
+  const headers = [
+    'Staff Member', 
+    'Booking Earnings', 
+    'Product Commission', 
+    'Total Earnings'
+  ];
+  
+  const salaryData: { 
+    [staffName: string]: { 
+      bookingEarnings: number; 
+      productEarnings: number; 
+      totalEarnings: number; 
+    } 
+  } = {};
+
+  // 1. Calculate earnings from Bookings
+  bookings.forEach(booking => {
+    if (booking.financial_entry?.photographer_details) {
+      booking.financial_entry.photographer_details.forEach(detail => {
+        const staffName = detail.staff_name;
+        if (!salaryData[staffName]) {
+          salaryData[staffName] = { bookingEarnings: 0, productEarnings: 0, totalEarnings: 0 };
+        }
+        salaryData[staffName].bookingEarnings += detail.amount;
+        salaryData[staffName].totalEarnings += detail.amount;
+      });
+    }
+  });
+
+  // 2. Calculate earnings from Product Orders
+  productOrders.forEach(order => {
+    if (order.financial_entry?.photographer_details) {
+      order.financial_entry.photographer_details.forEach(detail => {
+        const staffName = detail.staff_name;
+        if (!salaryData[staffName]) {
+          salaryData[staffName] = { bookingEarnings: 0, productEarnings: 0, totalEarnings: 0 };
+        }
+        salaryData[staffName].productEarnings += detail.amount;
+        salaryData[staffName].totalEarnings += detail.amount;
+      });
+    }
+  });
+
+  // If no data, return a message
+  if (Object.keys(salaryData).length === 0) {
+    return [
+      ['Salary Sheet'],
+      [''],
+      ['No earnings data found for any staff member in this period.']
+    ];
+  }
+
+  // Convert to array and format for Excel
+  const data = Object.entries(salaryData)
+    .map(([staffName, totals]) => [
+      staffName,
+      `Rs. ${totals.bookingEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Rs. ${totals.productEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Rs. ${totals.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ])
+    .sort((a, b) => {
+      // Sort by total earnings (column 3) descending
+      const earningsA = parseFloat((a[3] as string).replace(/[^\d.]/g, ''));
+      const earningsB = parseFloat((b[3] as string).replace(/[^\d.]/g, ''));
+      return earningsB - earningsA;
+    });
+
+  // Add summary row
+  const totalBookings = Object.values(salaryData).reduce((sum, d) => sum + d.bookingEarnings, 0);
+  const totalProducts = Object.values(salaryData).reduce((sum, d) => sum + d.productEarnings, 0);
+  const totalOverall = Object.values(salaryData).reduce((sum, d) => sum + d.totalEarnings, 0);
+  
+  data.push(
+    [''],
+    [
+      'SUMMARY', 
+      `Rs. ${totalBookings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Rs. ${totalProducts.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Rs. ${totalOverall.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     ]
   );
 

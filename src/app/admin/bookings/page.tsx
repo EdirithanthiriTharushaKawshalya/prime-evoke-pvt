@@ -4,7 +4,13 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BookingCard } from "@/components/ui/BookingCard";
 import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
-import { Booking, Profile, TeamMember, ServicePackage, FinancialEntry, PhotographerFinancialDetail, ProductOrder } from "@/lib/types";
+import { 
+  Booking, 
+  Profile, 
+  TeamMember, 
+  ServicePackage, 
+  ProductOrder 
+} from "@/lib/types";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
@@ -28,7 +34,7 @@ const groupBookingsByMonth = (bookings: Booking[]) => {
   }, {} as Record<string, Booking[]>);
 };
 
-// --- NEW: Helper function to group product orders by month ---
+// Helper function to group product orders by month
 const groupProductOrdersByMonth = (orders: ProductOrder[]) => {
   return orders.reduce((acc, order) => {
     const groupDate = new Date(order.created_at);
@@ -44,7 +50,7 @@ const groupProductOrdersByMonth = (orders: ProductOrder[]) => {
 
 // Main Async Server Component
 export default async function AdminBookingsPage() {
-  // ✅ Fully Next.js 15-compatible Supabase client
+  const cookieStore = cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -59,7 +65,7 @@ export default async function AdminBookingsPage() {
           try {
             store.set({ name, value, ...options });
           } catch {
-            // Ignore errors if middleware manages session updates
+            // Ignore errors
           }
         },
         remove: async (name: string, options?: CookieOptions) => {
@@ -67,7 +73,7 @@ export default async function AdminBookingsPage() {
           try {
             store.delete({ name, ...options });
           } catch {
-            // Ignore errors if middleware manages session updates
+            // Ignore errors
           }
         },
       },
@@ -82,13 +88,7 @@ export default async function AdminBookingsPage() {
 
   if (sessionError) {
     console.error("Session fetch error:", sessionError);
-    return (
-      <p className="text-destructive text-center mt-10">
-        Error checking authentication. Please try logging in again.
-      </p>
-    );
   }
-
   if (!session) {
     redirect("/login");
   }
@@ -103,27 +103,21 @@ export default async function AdminBookingsPage() {
 
   if (profileError || !profile) {
     console.error("Error fetching profile:", profileError);
-    return (
-      <p className="text-destructive text-center mt-10">
-        Could not load user profile. Please contact support.
-      </p>
-    );
   }
 
-  const userRole = profile.role ?? "staff";
-  const userName = profile.full_name || session.user.email || "Unknown User";
+  const userRole = profile?.role ?? "staff";
+  const userName = profile?.full_name || session.user.email || "Unknown User";
 
   // --- Fetch Packages ---
   let packages: ServicePackage[] = [];
-  const { data: packagesData, error: packagesError } = await supabase
+  const { data: packagesData } = await supabase
     .from("services")
     .select("*");
-
-  if (!packagesError && packagesData) {
+  if (packagesData) {
     packages = packagesData as ServicePackage[];
   }
 
-  // --- Fetch Bookings ---
+  // --- Fetch Bookings (Sequential Method) ---
   let bookings: Booking[] = [];
   let fetchError: string | null = null;
 
@@ -138,7 +132,7 @@ export default async function AdminBookingsPage() {
   } else if (bookingData) {
     bookings = bookingData as Booking[];
 
-    // Fetch financial entries for these bookings
+    // Now, fetch financial entries for these bookings
     const bookingIds = bookings.map(b => b.id);
     if (bookingIds.length > 0) {
       const { data: financialEntries, error: financialError } = await supabase
@@ -146,45 +140,29 @@ export default async function AdminBookingsPage() {
         .select('*')
         .in('booking_id', bookingIds);
 
-      if (!financialError && financialEntries) {
-        // ✅ NEW: Fetch photographer financial details for these bookings
-        const { data: photographerDetails, error: photographerError } = await supabase
-          .from('photographer_financial_details')
-          .select('*')
-          .in('booking_id', bookingIds);
+      // And fetch photographer details
+      const { data: photographerDetails, error: photographerError } = await supabase
+        .from('photographer_financial_details')
+        .select('*')
+        .in('booking_id', bookingIds);
 
-        if (!photographerError && photographerDetails) {
-          // Map financial entries and photographer details to bookings
-          bookings = bookings.map(booking => {
-            const financialEntry = financialEntries.find(fe => fe.booking_id === booking.id);
-            const photographerDetailsForBooking = photographerDetails.filter(pd => pd.booking_id === booking.id);
-            
-            return {
-              ...booking,
-              financial_entry: financialEntry ? {
-                ...financialEntry,
-                photographer_details: photographerDetailsForBooking
-              } : null
-            };
-          }) as Booking[];
-        } else {
-          // Map only financial entries if photographer details not available
-          bookings = bookings.map(booking => ({
-            ...booking,
-            financial_entry: financialEntries.find(fe => fe.booking_id === booking.id) || null
-          })) as Booking[];
-        }
-      } else {
-        // No financial entries found, set all to null
-        bookings = bookings.map(booking => ({
+      // Now, map them together
+      bookings = bookings.map(booking => {
+        const financialEntry = financialError ? null : financialEntries?.find(fe => fe.booking_id === booking.id);
+        const photographerDetailsForBooking = photographerError ? [] : photographerDetails?.filter(pd => pd.booking_id === booking.id);
+        
+        return {
           ...booking,
-          financial_entry: null
-        })) as Booking[];
-      }
+          financial_entry: financialEntry ? {
+            ...financialEntry,
+            photographer_details: photographerDetailsForBooking
+          } : null
+        };
+      }) as Booking[];
     }
   }
   
-  // --- NEW: Fetch Product Orders ---
+  // --- Fetch Product Orders (Sequential Method) ---
   let productOrders: ProductOrder[] = [];
   const { data: productOrderData, error: productOrderError } = await supabase
     .from("product_orders")
@@ -196,11 +174,39 @@ export default async function AdminBookingsPage() {
     console.error("Error fetching product orders:", productOrderError);
   } else if (productOrderData) {
     productOrders = productOrderData as ProductOrder[];
+
+    // Now, fetch financial entries for these orders
+    const orderIds = productOrders.map(o => o.id);
+    if (orderIds.length > 0) {
+      const { data: poFinancialEntries, error: poFinancialError } = await supabase
+        .from('product_order_financial_entries')
+        .select('*')
+        .in('order_id', orderIds);
+
+      // And fetch photographer commission details
+      const { data: poPhotographerDetails, error: poPhotographerError } = await supabase
+        .from('product_order_photographer_commission')
+        .select('*')
+        .in('order_id', orderIds);
+      
+      // Now, map them together
+      productOrders = productOrders.map(order => {
+        const financialEntry = poFinancialError ? null : poFinancialEntries?.find(fe => fe.order_id === order.id);
+        const photographerDetailsForOrder = poPhotographerError ? [] : poPhotographerDetails?.filter(pd => pd.order_id === order.id);
+
+        return {
+          ...order,
+          financial_entry: financialEntry ? {
+            ...financialEntry,
+            photographer_details: photographerDetailsForOrder
+          } : null
+        };
+      }) as ProductOrder[];
+    }
   }
 
   // --- Fetch Available Staff ---
   let assignableMembers: TeamMember[] = [];
-
   const { data: membersData, error: membersError } = await supabase
     .from("team_members")
     .select("id, name")
@@ -237,7 +243,6 @@ export default async function AdminBookingsPage() {
     return dateB.getTime() - dateA.getTime();
   });
   
-  // --- NEW: Group and Sort Product Orders ---
   const groupedProductOrders = groupProductOrdersByMonth(productOrders);
   const sortedOrderMonths = Object.keys(groupedProductOrders).sort((a, b) => {
     return new Date(b).getTime() - new Date(a).getTime(); // Simple descending sort
@@ -272,7 +277,7 @@ export default async function AdminBookingsPage() {
           </p>
         )}
 
-        {/* --- NEW: Tabbed Interface --- */}
+        {/* --- Tabbed Interface --- */}
         <Tabs defaultValue="bookings" className="w-full">
           <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-8">
             <TabsTrigger value="bookings">Client Bookings</TabsTrigger>
@@ -285,7 +290,7 @@ export default async function AdminBookingsPage() {
               <div className="text-center py-12">
                 <div className="text-muted-foreground text-lg">No bookings found.</div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  When clients submit inquiries through your studio websites, they will appear here.
+                  When clients submit inquiries, they will appear here.
                 </p>
               </div>
             )}
@@ -338,6 +343,7 @@ export default async function AdminBookingsPage() {
                       key={order.id}
                       order={order}
                       userRole={userRole}
+                      availableStaff={availableStaff} // <-- Correctly passing staff
                     />
                   ))}
                 </div>

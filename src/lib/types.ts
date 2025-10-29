@@ -97,7 +97,7 @@ export type Booking = {
   created_at: string;
   full_name: string;
   email: string;
-  mobile_number: string | null; 
+  mobile_number: string | null;
   event_type: string | null;
   package_name: string | null;
   event_date: string | null;
@@ -111,11 +111,11 @@ export type Booking = {
 
 // types.ts - Add new type
 export type PhotographerFinancialDetail = {
-    id: number;
-    created_at: string;
-    booking_id: number;
-    staff_name: string;
-    amount: number;
+  id: number;
+  created_at: string;
+  booking_id: number;
+  staff_name: string;
+  amount: number;
 };
 
 // --- NEW Product Types ---
@@ -148,7 +148,7 @@ export type Album = {
 // --- NEW Order Types ---
 
 export type OrderedItem = {
-  type: 'frame' | 'print' | 'album';
+  type: "frame" | "print" | "album";
   id: number; // ID of the specific frame/print/album
   size: string;
   material?: string | null; // For frames
@@ -160,6 +160,28 @@ export type OrderedItem = {
   line_total: number; // quantity * price
 };
 
+export type ProductOrderPhotographerCommission = {
+  id: number;
+  created_at: string;
+  order_id: number;
+  staff_name: string;
+  amount: number;
+};
+
+export type ProductOrderFinancialEntry = {
+  id: number;
+  created_at: string;
+  order_id: number;
+  order_amount: number | null;
+  photographer_commission_total: number | null;
+  studio_fee: number | null;
+  other_expenses: number | null;
+  profit: number | null;
+  photographer_details?: ProductOrderPhotographerCommission[];
+};
+
+// --- UPDATE ProductOrder Type ---
+
 export type ProductOrder = {
   id: number;
   created_at: string;
@@ -170,4 +192,7 @@ export type ProductOrder = {
   ordered_items: OrderedItem[] | null; // Array of ordered items
   total_amount: number;
   status: string | null;
+  studio_slug: string; // <-- ADDED
+  assigned_photographers: string[] | null; // <-- ADDED
+  financial_entry?: ProductOrderFinancialEntry | null; // <-- ADDED
 };

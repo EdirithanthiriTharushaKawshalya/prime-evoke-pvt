@@ -352,7 +352,8 @@ export default function BookingPage() {
         customer_email: values.customer_email,
         customer_mobile: values.customer_mobile || null,
         ordered_items: orderedItems,
-        total_amount: orderTotal
+        total_amount: orderTotal,
+        studio_slug: studioId // <-- ADD THIS LINE
     };
 
     // Call Server Action

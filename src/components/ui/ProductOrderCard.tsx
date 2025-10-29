@@ -1,15 +1,21 @@
 // components/ui/ProductOrderCard.tsx
 "use client";
 
+import { useState } from "react";
 import { ProductOrder, OrderedItem } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, Mail, Phone, ShoppingCart, DollarSign } from "lucide-react";
-import { UpdateProductOrderStatus } from "./UpdateProductOrderStatus"; // Import new component
+import { User, Mail, Phone, ShoppingCart, DollarSign, Camera } from "lucide-react";
+import { UpdateProductOrderStatus } from "./UpdateProductOrderStatus";
+import { AssignProductOrderPhotographers } from "./AssignProductOrderPhotographers";
+import { ProductOrderFinancialDialog } from "./ProductOrderFinancialDialog";
+import { Button } from "./button";
+import { DeleteProductOrderButton } from "./DeleteProductOrderButton";
 
 interface ProductOrderCardProps {
   order: ProductOrder;
   userRole: string;
+  availableStaff: { id: string; full_name: string }[];
 }
 
 // Helper to format currency
@@ -26,8 +32,9 @@ const formatItemDetails = (item: OrderedItem) => {
   return details;
 };
 
-export function ProductOrderCard({ order, userRole }: ProductOrderCardProps) {
-  
+export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrderCardProps) {
+  const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not specified";
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -37,90 +44,169 @@ export function ProductOrderCard({ order, userRole }: ProductOrderCardProps) {
     });
   };
 
-  return (
-    <Card className="hover:shadow-lg transition-shadow duration-200">
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <User className="h-4 w-4" />
-              {order.customer_name}
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Order ID: {order.order_id}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Date: {formatDate(order.created_at)}
-            </p>
-          </div>
-          <UpdateProductOrderStatus
-            orderId={order.id}
-            currentStatus={order.status || "Pending"}
-            userRole={userRole}
-          />
-        </div>
-      </CardHeader>
+  // Format studio slug to readable name
+  const formatStudioName = (studioSlug: string) => {
+    if (!studioSlug) return "Unknown Studio";
+    return studioSlug
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
 
-      <CardContent className="space-y-4">
-        {/* Contact Info */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            <a
-              href={`mailto:${order.customer_email}`}
-              className="text-blue-600 hover:underline"
-            >
-              {order.customer_email}
-            </a>
+  return (
+    <>
+      <Card className="hover:shadow-lg transition-shadow duration-200">
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="h-4 w-4" />
+                {order.customer_name}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Order ID: {order.order_id}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Date: {formatDate(order.created_at)}
+              </p>
+            </div>
+            <UpdateProductOrderStatus
+              orderId={order.id}
+              currentStatus={order.status || "Pending"}
+              userRole={userRole}
+            />
           </div>
-          {order.customer_mobile && (
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {/* Studio Badge */}
+          <div className="flex items-center gap-2 text-sm">
+            <Camera className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Studio:</span>
+            <Badge variant="secondary" className="text-xs">
+              {formatStudioName(order.studio_slug)}
+            </Badge>
+          </div>
+        
+          {/* Contact Info */}
+          <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
-              <Phone className="h-4 w-4 text-muted-foreground" />
+              <Mail className="h-4 w-4 text-muted-foreground" />
               <a
-                href={`tel:${order.customer_mobile}`}
+                href={`mailto:${order.customer_email}`}
                 className="text-blue-600 hover:underline"
               >
-                {order.customer_mobile}
+                {order.customer_email}
               </a>
             </div>
-          )}
-        </div>
+            {order.customer_mobile && (
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <a
+                  href={`tel:${order.customer_mobile}`}
+                  className="text-blue-600 hover:underline"
+                >
+                  {order.customer_mobile}
+                </a>
+              </div>
+            )}
+          </div>
 
-        {/* Ordered Items */}
-        <div className="border-t pt-3 space-y-2">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            Ordered Items
-          </h4>
-          <ul className="space-y-1 text-sm text-muted-foreground">
-            {order.ordered_items?.map((item, index) => (
-              <li key={index} className="flex justify-between items-start">
-                <div className="flex-1 pr-2">
+          {/* Ordered Items */}
+          <div className="border-t pt-3 space-y-2">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              Ordered Items
+            </h4>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {order.ordered_items?.map((item, index) => (
+                <li key={index} className="flex justify-between items-start">
+                  <div className="flex-1 pr-2">
+                    <span className="font-medium text-foreground">
+                      {item.quantity}x
+                    </span>{" "}
+                    <Badge variant="secondary" className="text-xs capitalize mr-1">{item.type}</Badge>
+                    {formatItemDetails(item)}
+                  </div>
                   <span className="font-medium text-foreground">
-                    {item.quantity}x
-                  </span>{" "}
-                  <Badge variant="secondary" className="text-xs capitalize mr-1">{item.type}</Badge>
-                  {formatItemDetails(item)}
-                </div>
-                <span className="font-medium text-foreground">
-                  {formatCurrency(item.line_total)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+                    {formatCurrency(item.line_total)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        {/* Total Amount */}
-        <div className="border-t pt-3 flex justify-between items-center">
+          {/* Total Amount */}
+          <div className="border-t pt-3 flex justify-between items-center">
             <h4 className="text-base font-semibold flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Total Amount
+              <DollarSign className="h-5 w-5" />
+              Total Amount
             </h4>
             <span className="text-lg font-bold">
-                {formatCurrency(order.total_amount)}
+              {formatCurrency(order.total_amount)}
             </span>
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+          
+          {/* Financial Status */}
+          {order.financial_entry && (
+            <div className="flex items-center gap-2 text-sm">
+              <DollarSign className="h-4 w-4 text-green-600" />
+              <span className="text-muted-foreground">Financials:</span>
+              <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                Completed
+              </Badge>
+            </div>
+          )}
+          
+          {/* Assigned Photographers */}
+          {order.assigned_photographers &&
+            order.assigned_photographers.length > 0 && (
+              <div className="text-sm">
+                <span className="text-muted-foreground">Assigned Staff:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {order.assigned_photographers.map((photographer, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {photographer}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {/* Action Buttons */}
+          {userRole === "management" && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsFinancialDialogOpen(true)}
+              >
+                <DollarSign className="h-3 w-3 mr-1" />
+                Financial
+              </Button>
+              <AssignProductOrderPhotographers
+                orderId={order.id}
+                currentAssignments={order.assigned_photographers || []}
+                availableStaff={availableStaff}
+                userRole={userRole}
+              />
+              <DeleteProductOrderButton
+                orderId={order.id}
+                userRole={userRole}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Financial Dialog */}
+      {userRole === "management" && (
+        <ProductOrderFinancialDialog
+          order={order}
+          open={isFinancialDialogOpen}
+          onOpenChange={setIsFinancialDialogOpen}
+        />
+      )}
+    </>
   );
 }

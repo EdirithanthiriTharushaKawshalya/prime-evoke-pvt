@@ -1,10 +1,20 @@
 // actions.ts - Full updated file
 "use server";
 
-import { createServerClient } from '@supabase/ssr';
+import { CookieOptions, createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail, OrderedItem, ProductOrder } from '@/lib/types';
+import { 
+  Booking, 
+  ServicePackage, 
+  TeamMember, 
+  FinancialEntry, 
+  PhotographerFinancialDetail, 
+  OrderedItem, 
+  ProductOrder,
+  ProductOrderFinancialEntry,
+  ProductOrderPhotographerCommission
+} from '@/lib/types';
 
 // --- generateMonthlyReport function ---
 export async function generateMonthlyReport(month: string, year: string) {
@@ -39,7 +49,6 @@ export async function generateMonthlyReport(month: string, year: string) {
   }
 
   try {
-    // Calculate date range for the month
     const startDate = new Date(parseInt(year), parseInt(month) - 1, 1).toISOString();
     const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59).toISOString();
 
@@ -47,34 +56,30 @@ export async function generateMonthlyReport(month: string, year: string) {
     const { data: bookings, error: bookingsError } = await supabase
       .from('client_bookings')
       .select('*')
-      .gte('event_date', startDate.split('T')[0]) // Note: This is event_date
+      .gte('event_date', startDate.split('T')[0])
       .lte('event_date', endDate.split('T')[0])
       .order('event_date', { ascending: true });
 
     if (bookingsError) throw bookingsError;
-
-    // --- NEW: Fetch Product Orders ---
+      
+    // --- Fetch Product Orders (existing) ---
     const { data: productOrders, error: ordersError } = await supabase
       .from('product_orders')
       .select('*')
-      .gte('created_at', startDate) // Product orders use created_at
+      .gte('created_at', startDate) 
       .lte('created_at', endDate)
       .order('created_at', { ascending: true });
       
     if (ordersError) throw ordersError;
 
-    // --- Fetch Packages (existing) ---
     const { data: packages, error: packagesError } = await supabase
       .from('services')
       .select('*');
-
     if (packagesError) throw packagesError;
 
-    // --- Fetch Team Members (existing) ---
     const { data: teamMembers, error: membersError } = await supabase
       .from('team_members')
       .select('*');
-
     if (membersError) throw membersError;
 
     // --- Process Bookings with Financials (existing) ---
@@ -91,24 +96,48 @@ export async function generateMonthlyReport(month: string, year: string) {
           .from('photographer_financial_details')
           .select('*')
           .in('booking_id', bookingIds);
-
-        if (!photographerError && photographerDetails) {
-          bookingsWithFinancial = bookings.map(booking => ({
-            ...booking,
-            financial_entry: booking.financial_entry ? {
-              ...booking.financial_entry,
-              photographer_details: photographerDetails.filter(detail => detail.booking_id === booking.id)
-            } : null
-          })) as Booking[];
-        } else {
-            bookingsWithFinancial = bookings.map(booking => ({
+        
+        bookingsWithFinancial = bookings.map(booking => {
+            const entry = financialEntries.find(fe => fe.booking_id === booking.id);
+            const details = photographerError ? [] : photographerDetails?.filter(pd => pd.booking_id === booking.id);
+            return {
                 ...booking,
-                financial_entry: financialEntries.find(fe => fe.booking_id === booking.id) || null
-            })) as Booking[];
-        }
+                financial_entry: entry ? { ...entry, photographer_details: details } : null
+            };
+        }) as Booking[];
       } else {
         bookingsWithFinancial = bookings as Booking[];
       }
+    }
+
+    // --- NEW: Process Product Orders with Financials ---
+    let productOrdersWithFinancial: ProductOrder[] = [];
+    if (productOrders && productOrders.length > 0) {
+      const orderIds = productOrders.map(o => o.id);
+
+      // Fetch main financial entries
+      const { data: poFinancialEntries, error: poFinancialError } = await supabase
+        .from('product_order_financial_entries')
+        .select('*')
+        .in('order_id', orderIds);
+
+      // Fetch photographer commission details
+      const { data: poPhotographerDetails, error: poPhotographerError } = await supabase
+        .from('product_order_photographer_commission')
+        .select('*')
+        .in('order_id', orderIds);
+
+      productOrdersWithFinancial = productOrders.map(order => {
+        const entry = poFinancialError ? null : poFinancialEntries?.find(fe => fe.order_id === order.id);
+        const details = poPhotographerError ? [] : poPhotographerDetails?.filter(pd => pd.order_id === order.id);
+        return {
+          ...order,
+          financial_entry: entry ? { ...entry, photographer_details: details } : null
+        };
+      }) as ProductOrder[];
+
+    } else {
+      productOrdersWithFinancial = productOrders as ProductOrder[];
     }
 
     // --- Generate Excel Report ---
@@ -117,19 +146,18 @@ export async function generateMonthlyReport(month: string, year: string) {
       bookings: bookingsWithFinancial || [],
       packages: packages || [],
       teamMembers: teamMembers || [],
-      productOrders: productOrders || [], // Pass product orders to excel
+      productOrders: productOrdersWithFinancial || [], // Pass ENHANCED product orders
       month,
       year
     });
 
-    // Convert blob to base64 for response
     const buffer = await excelBlob.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
 
     return { 
       success: true, 
       data: base64,
-      fileName: `bookings-report-${month}-${year}.xlsx`
+      fileName: `report-${month}-${year}.xlsx`
     };
 
   } catch (error) {
@@ -404,7 +432,7 @@ export async function updateFinancialEntry(
   }
 }
 
-// --- NEW: updatePhotographerFinancialDetails function ---
+// --- updatePhotographerFinancialDetails function ---
 export async function updatePhotographerFinancialDetails(
   bookingId: number,
   photographerDetails: PhotographerFinancialDetail[]
@@ -512,7 +540,7 @@ export async function getFinancialEntries(bookingIds: number[]) {
     return { error: error.message };
   }
 
-  // ✅ NEW: Fetch photographer details for these bookings
+  // ✅ Fetch photographer details for these bookings
   if (financialEntries && financialEntries.length > 0) {
     const { data: photographerDetails, error: photographerError } = await supabase
       .from('photographer_financial_details')
@@ -700,7 +728,7 @@ export async function updateBooking(
   return { success: true };
 }
 
-// --- NEW: getPhotographerMonthlyEarnings function ---
+// --- getPhotographerMonthlyEarnings function ---
 export async function getPhotographerMonthlyEarnings(month: string, year: string) {
   const cookieStore = await cookies();
 
@@ -805,13 +833,208 @@ export async function getPhotographerMonthlyEarnings(month: string, year: string
   }
 }
 
-// --- NEW: Submit Product Order ---
+// --- NEW: updateProductOrderAssignments function ---
+export async function updateProductOrderAssignments(
+  orderId: number,
+  newAssignments: string[]
+) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) return { error: sessionError.message };
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) return { error: profileError.message };
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can assign staff." };
+  }
+
+  // Update the product_orders assignments
+  const { error: updateError } = await supabase
+    .from('product_orders')
+    .update({ assigned_photographers: newAssignments })
+    .eq('id', orderId);
+
+  if (updateError) {
+    console.error("Error updating order assignments:", updateError);
+    return { error: updateError.message };
+  }
+
+  revalidatePath('/admin/bookings');
+  return { success: true };
+}
+
+// --- NEW: updateProductOrderFinancialEntry function ---
+export async function updateProductOrderFinancialEntry(
+  orderId: number,
+  financialData: {
+    order_amount: number;
+    studio_fee: number;
+    other_expenses: number;
+    profit: number;
+    photographer_commission_total: number;
+  }
+) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can update financial data." };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('product_order_financial_entries')
+      .upsert({ 
+        order_id: orderId, 
+        ...financialData 
+      }, { onConflict: 'order_id' });
+
+    if (error) throw error;
+
+    revalidatePath('/admin/bookings');
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error updating product financial entry:", error);
+    return { error: error.message };
+  }
+}
+
+// --- NEW: updateProductOrderPhotographerCommission function ---
+export async function updateProductOrderPhotographerCommission(
+  orderId: number,
+  photographerDetails: ProductOrderPhotographerCommission[]
+) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can update financial data." };
+  }
+
+  try {
+    // 1. Delete existing details for this order
+    const { error: deleteError } = await supabase
+      .from('product_order_photographer_commission')
+      .delete()
+      .eq('order_id', orderId);
+
+    if (deleteError) throw deleteError;
+
+    // 2. Insert new details (only those with amount > 0)
+    const detailsToInsert = photographerDetails
+      .filter(detail => detail.amount > 0)
+      .map(detail => ({
+        order_id: orderId,
+        staff_name: detail.staff_name,
+        amount: detail.amount
+      }));
+    
+    if (detailsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('product_order_photographer_commission')
+        .insert(detailsToInsert);
+
+      if (insertError) throw insertError;
+    }
+
+    revalidatePath('/admin/bookings');
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error in updateProductOrderPhotographerCommission:", error);
+    return { error: error.message };
+  }
+}
+
+// --- UPDATED: Submit Product Order ---
 export async function submitProductOrder(formData: {
     customer_name: string;
     customer_email: string;
     customer_mobile: string | null;
     ordered_items: OrderedItem[];
     total_amount: number;
+    studio_slug: string; // <-- ADDED
 }) {
     const cookieStore = await cookies();
 
@@ -826,8 +1049,6 @@ export async function submitProductOrder(formData: {
             },
         }
     );
-
-    // Optional: Add authentication check if needed, but assuming public order for now
 
     // Generate a unique Order ID
     const generateOrderId = (): string => {
@@ -848,15 +1069,17 @@ export async function submitProductOrder(formData: {
                 customer_mobile: formData.customer_mobile,
                 ordered_items: formData.ordered_items,
                 total_amount: formData.total_amount,
-                status: 'New', // Changed from 'Pending' to 'New'
+                status: 'New',
+                studio_slug: formData.studio_slug, // <-- ADDED
+                assigned_photographers: [], // <-- ADDED (initialize as empty)
             }])
-            .select('id, order_id') // Select the generated ID and order_id
+            .select('id, order_id')
             .single();
 
         if (error) throw error;
 
-        revalidatePath('/admin/bookings'); // Revalidate admin page if needed
-        return { success: true, orderId: data?.order_id }; // Return success and the order ID
+        revalidatePath('/admin/bookings');
+        return { success: true, orderId: data?.order_id };
 
     } catch (error: unknown) {
         console.error("Product order submission error:", error);
@@ -865,7 +1088,7 @@ export async function submitProductOrder(formData: {
     }
 }
 
-// --- NEW: updateProductOrderStatus function ---
+// --- updateProductOrderStatus function ---
 export async function updateProductOrderStatus(
   orderId: number,
   newStatus: string
@@ -907,9 +1130,8 @@ export async function updateProductOrderStatus(
     return { error: "Permission denied. Only management can update status." };
   }
 
-  // --- THIS IS THE FIX ---
-  // The valid statuses must match your new dropdown
-  const validStatuses = ["New", "Contacted", "Confirmed", "Completed", "Cancelled"];
+  // Validate Status
+  const validStatuses = ["New", "Processing", "Ready for Pickup", "Completed", "Cancelled"];
   if (!validStatuses.includes(newStatus)) {
     return { error: "Invalid status value." };
   }
@@ -921,11 +1143,103 @@ export async function updateProductOrderStatus(
     .eq('id', orderId);
 
   if (updateError) {
-    console.error("Error updating order status:", updateError);
+    console.error("Error updating product order status:", updateError);
     return { error: updateError.message };
   }
 
-  // Revalidate the path to refresh data on the admin page
+  // Revalidate the path to refresh data
   revalidatePath('/admin/bookings');
   return { success: true };
+}
+
+// --- NEW: deleteProductOrder function ---
+export async function deleteProductOrder(orderId: number) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set: (name: string, value: string, options: CookieOptions) => {
+          cookieStore.set({ name, value, ...options });
+        },
+        remove: (name: string, options: CookieOptions) => {
+          cookieStore.delete({ name, ...options });
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can delete orders." };
+  }
+
+  // --- Deletion Logic ---
+  // Delete related financial data first to respect foreign key constraints
+
+  try {
+    // 1. Delete photographer commission details
+    const { error: commissionError } = await supabase
+      .from('product_order_photographer_commission')
+      .delete()
+      .eq('order_id', orderId);
+
+    if (commissionError) {
+      console.error("Error deleting commission details:", commissionError);
+      throw new Error("Failed to delete related commission data.");
+    }
+    
+    // 2. Delete main financial entry
+    const { error: financialError } = await supabase
+      .from('product_order_financial_entries')
+      .delete()
+      .eq('order_id', orderId);
+
+    if (financialError) {
+      console.error("Error deleting financial entry:", financialError);
+      throw new Error("Failed to delete related financial entry.");
+    }
+
+    // 3. Delete the product order itself
+    const { error: orderError } = await supabase
+      .from('product_orders')
+      .delete()
+      .eq('id', orderId);
+
+    if (orderError) {
+      console.error("Error deleting product order:", orderError);
+      throw new Error("Failed to delete the product order.");
+    }
+
+    // Revalidate the path to refresh data
+    revalidatePath('/admin/bookings');
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error in deleteProductOrder transaction:", error);
+    return { error: error.message || "An unexpected error occurred during deletion." };
+  }
 }
