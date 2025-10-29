@@ -6,13 +6,10 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { 
   Booking, 
-  ServicePackage, 
   TeamMember, 
-  FinancialEntry, 
   PhotographerFinancialDetail, 
   OrderedItem, 
   ProductOrder,
-  ProductOrderFinancialEntry,
   ProductOrderPhotographerCommission
 } from '@/lib/types';
 
@@ -944,9 +941,10 @@ export async function updateProductOrderFinancialEntry(
     revalidatePath('/admin/bookings');
     return { success: true };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating product financial entry:", error);
-    return { error: error.message };
+    const message = error instanceof Error ? error.message : "An unexpected error occurred";
+    return { error: message };
   }
 }
 
@@ -1021,9 +1019,10 @@ export async function updateProductOrderPhotographerCommission(
     revalidatePath('/admin/bookings');
     return { success: true };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in updateProductOrderPhotographerCommission:", error);
-    return { error: error.message };
+    const message = error instanceof Error ? error.message : "An unexpected error occurred";
+    return { error: message };
   }
 }
 
@@ -1127,11 +1126,11 @@ export async function updateProductOrderStatus(
   }
 
   if (profile?.role !== 'management') {
-    return { error: "Permission denied. Only management can update status." };
+    return { error: "Permission denied. Only management can update order status." };
   }
 
   // Validate Status
-  const validStatuses = ["New", "Processing", "Ready for Pickup", "Completed", "Cancelled"];
+  const validStatuses = ["New", "In Progress", "Completed", "Cancelled"];
   if (!validStatuses.includes(newStatus)) {
     return { error: "Invalid status value." };
   }
@@ -1147,12 +1146,12 @@ export async function updateProductOrderStatus(
     return { error: updateError.message };
   }
 
-  // Revalidate the path to refresh data
+  // Revalidate the path to refresh data on the admin page
   revalidatePath('/admin/bookings');
   return { success: true };
 }
 
-// --- NEW: deleteProductOrder function ---
+// --- deleteProductOrder function ---
 export async function deleteProductOrder(orderId: number) {
   const cookieStore = await cookies();
 
@@ -1163,12 +1162,6 @@ export async function deleteProductOrder(orderId: number) {
       cookies: {
         get(name: string) {
           return cookieStore.get(name)?.value;
-        },
-        set: (name: string, value: string, options: CookieOptions) => {
-          cookieStore.set({ name, value, ...options });
-        },
-        remove: (name: string, options: CookieOptions) => {
-          cookieStore.delete({ name, ...options });
         },
       },
     }
@@ -1197,49 +1190,65 @@ export async function deleteProductOrder(orderId: number) {
     return { error: "Permission denied. Only management can delete orders." };
   }
 
-  // --- Deletion Logic ---
-  // Delete related financial data first to respect foreign key constraints
+  // Perform the deletion
+  const { error: deleteError } = await supabase
+    .from('product_orders')
+    .delete()
+    .eq('id', orderId);
 
-  try {
-    // 1. Delete photographer commission details
-    const { error: commissionError } = await supabase
-      .from('product_order_photographer_commission')
-      .delete()
-      .eq('order_id', orderId);
-
-    if (commissionError) {
-      console.error("Error deleting commission details:", commissionError);
-      throw new Error("Failed to delete related commission data.");
-    }
-    
-    // 2. Delete main financial entry
-    const { error: financialError } = await supabase
-      .from('product_order_financial_entries')
-      .delete()
-      .eq('order_id', orderId);
-
-    if (financialError) {
-      console.error("Error deleting financial entry:", financialError);
-      throw new Error("Failed to delete related financial entry.");
-    }
-
-    // 3. Delete the product order itself
-    const { error: orderError } = await supabase
-      .from('product_orders')
-      .delete()
-      .eq('id', orderId);
-
-    if (orderError) {
-      console.error("Error deleting product order:", orderError);
-      throw new Error("Failed to delete the product order.");
-    }
-
-    // Revalidate the path to refresh data
-    revalidatePath('/admin/bookings');
-    return { success: true };
-
-  } catch (error: any) {
-    console.error("Error in deleteProductOrder transaction:", error);
-    return { error: error.message || "An unexpected error occurred during deletion." };
+  if (deleteError) {
+    console.error("Error deleting product order:", deleteError);
+    return { error: deleteError.message };
   }
+
+  // Revalidate the path to refresh data on the admin page
+  revalidatePath('/admin/bookings');
+  return { success: true };
+}
+
+// --- getProductOrderFinancialEntries function ---
+export async function getProductOrderFinancialEntries(orderIds: number[]) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  const { data: financialEntries, error } = await supabase
+    .from('product_order_financial_entries')
+    .select('*')
+    .in('order_id', orderIds);
+
+  if (error) {
+    console.error("Error fetching product order financial entries:", error);
+    return { error: error.message };
+  }
+
+  // ✅ Fetch photographer commission details for these orders
+  if (financialEntries && financialEntries.length > 0) {
+    const { data: photographerDetails, error: photographerError } = await supabase
+      .from('product_order_photographer_commission')
+      .select('*')
+      .in('order_id', orderIds);
+
+    if (!photographerError && photographerDetails) {
+      // Map photographer details to financial entries
+      const entriesWithDetails = financialEntries.map(entry => ({
+        ...entry,
+        photographer_details: photographerDetails.filter(detail => detail.order_id === entry.order_id)
+      }));
+
+      return { financialEntries: entriesWithDetails };
+    }
+  }
+
+  return { financialEntries };
 }

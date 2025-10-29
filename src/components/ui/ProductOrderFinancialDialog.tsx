@@ -40,11 +40,11 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
 
   const [photographerDetails, setPhotographerDetails] = useState<ProductOrderPhotographerCommission[]>([]);
 
+  // Extract assigned photographers to a variable for stable reference
+  const assignedPhotographers = order.assigned_photographers || [];
+  
   // Memoize assigned staff
-  const assignedStaff = useMemo(() => 
-    order.assigned_photographers || [], 
-    [JSON.stringify(order.assigned_photographers)]
-  );
+  const assignedStaff = useMemo(() => assignedPhotographers, [assignedPhotographers]);
 
   // Initialize photographer details when dialog opens or staff changes
   useEffect(() => {
@@ -141,9 +141,10 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
       });
       onOpenChange(false);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
       toast.error("Save Failed", {
-        description: error.message || "An unexpected error occurred.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);

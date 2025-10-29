@@ -1,8 +1,8 @@
 // app/[studioId]/book/page.tsx - Full updated file
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useSearchParams, useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSearchParams, useParams } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -14,13 +14,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import {
-  Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { ServicePackage, Frame, PrintSize, Album, OrderedItem } from "@/lib/types";
 import { toast } from "sonner";
-import { CheckCircle, Copy, Calendar, Phone, ShoppingCart, Info, Trash2 } from "lucide-react";
+import { CheckCircle, Copy, Calendar, Phone, ShoppingCart } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { submitProductOrder } from "@/lib/actions";
 
@@ -62,7 +62,6 @@ const productOrderSchema = z.object({
 export default function BookingPage() {
   const searchParams = useSearchParams();
   const params = useParams();
-  const router = useRouter();
 
   const prefilledPackage = searchParams.get("package");
   const prefilledCategory = searchParams.get("category");
@@ -193,10 +192,11 @@ export default function BookingPage() {
               setPrintSizes(printsRes.data as PrintSize[]);
               setAlbums(albumsRes.data as Album[]);
 
-          } catch (error: any) {
+          } catch (error: unknown) {
               console.error("Error fetching products:", error);
+              const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
               setProductFetchError("Could not load product options. Please try again later.");
-              toast.error("Error loading products", { description: error.message });
+              toast.error("Error loading products", { description: errorMessage });
           }
       }
       fetchProducts();
@@ -916,7 +916,7 @@ export default function BookingPage() {
                                           min="0" 
                                           {...qtyField} 
                                           onChange={e => qtyField.onChange(parseInt(e.target.value) || 0)} 
-                                          className="w-20 h-8 text-sm bg-black/50 border-white/20 text-white"
+                                          className="w-20 h-8 text-sm bg-black/50 border-white/20 text-white text-center"
                                         />
                                       )}
                                     />
@@ -956,7 +956,7 @@ export default function BookingPage() {
                                           min="0" 
                                           {...qtyField} 
                                           onChange={e => qtyField.onChange(parseInt(e.target.value) || 0)} 
-                                          className="w-20 h-8 text-sm bg-black/50 border-white/20 text-white"
+                                          className="w-20 h-8 text-sm bg-black/50 border-white/20 text-white text-center"
                                         />
                                       )}
                                     />
@@ -996,7 +996,7 @@ export default function BookingPage() {
                                           min="0" 
                                           {...qtyField} 
                                           onChange={e => qtyField.onChange(parseInt(e.target.value) || 0)} 
-                                          className="w-20 h-8 text-sm bg-black/50 border-white/20 text-white"
+                                          className="w-20 h-8 text-sm bg-black/50 border-white/20 text-white text-center"
                                         />
                                       )}
                                     />
@@ -1008,14 +1008,12 @@ export default function BookingPage() {
 
                          {/* Order Total */}
                          <Card className="bg-blue-900/20 border-blue-600/30">
-                           <CardContent className="pt-6">
-                             <div className="flex justify-between items-center">
-                               <span className="text-lg font-semibold text-blue-200">Order Total:</span>
-                               <span className="text-2xl font-bold text-blue-300">
-                                 Rs. {orderTotal.toLocaleString()}
-                               </span>
-                             </div>
-                           </CardContent>
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-center">
+                                <span className="text-lg font-semibold text-blue-200">Order Total:</span>
+                                <span className="text-2xl font-bold text-blue-300">Rs. {orderTotal.toLocaleString()}</span>
+                              </div>
+                            </CardContent>
                          </Card>
 
                          {/* Submit Button */}
@@ -1024,12 +1022,12 @@ export default function BookingPage() {
                            disabled={isSubmittingOrder || orderTotal === 0}
                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                          >
-                           {isSubmittingOrder ? "Placing Order..." : "Place Order"}
+                           {isSubmittingOrder ? "Placing Order..." : `Place Order - Rs. ${orderTotal.toLocaleString()}`}
                          </Button>
                          {productForm.formState.errors.frames && (
-                           <p className="text-sm font-medium text-destructive text-center">
-                             {productForm.formState.errors.frames.message}
-                           </p>
+                            <p className="text-sm font-medium text-destructive text-center">
+                              {productForm.formState.errors.frames.message}
+                            </p>
                          )}
                      </form>
                 </Form>
