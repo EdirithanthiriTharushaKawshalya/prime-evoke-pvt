@@ -701,7 +701,7 @@ export default function BookingPage() {
 
   // --- Render Tabs and Forms ---
   return (
-    <div className="container mx-auto py-16 px-4 max-w-3xl">
+    <div className="container mx-auto py-16 px-4 max-w-3xl" data-aos="fade-up">
       <Tabs defaultValue={initialTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-8 rounded-full">
           <TabsTrigger value="session" className="rounded-full">Book a Session</TabsTrigger>

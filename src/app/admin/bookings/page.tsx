@@ -250,7 +250,7 @@ export default async function AdminBookingsPage() {
 
   // --- Render ---
   return (
-    <div className="relative min-h-screen flex flex-col">
+    <div className="relative min-h-screen flex flex-col" data-aos="fade-up">
       <AnimatedBackground />
       <Header />
       <div className="container mx-auto py-10 px-4">
