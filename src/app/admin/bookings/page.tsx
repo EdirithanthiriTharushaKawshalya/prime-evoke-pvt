@@ -279,9 +279,9 @@ export default async function AdminBookingsPage() {
 
         {/* --- Tabbed Interface --- */}
         <Tabs defaultValue="bookings" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-8">
-            <TabsTrigger value="bookings">Client Bookings</TabsTrigger>
-            <TabsTrigger value="products">Product Orders</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-8 rounded-full">
+            <TabsTrigger value="bookings" className="rounded-full">Client Bookings</TabsTrigger>
+            <TabsTrigger value="products" className="rounded-full">Product Orders</TabsTrigger>
           </TabsList>
 
           {/* --- Bookings Tab --- */}
