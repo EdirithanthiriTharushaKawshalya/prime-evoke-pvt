@@ -118,3 +118,56 @@ export type PhotographerFinancialDetail = {
     amount: number;
 };
 
+// --- NEW Product Types ---
+
+export type Frame = {
+  id: number;
+  size: string;
+  material: string | null;
+  price: number;
+  description: string | null;
+  image_url: string | null;
+};
+
+export type PrintSize = {
+  id: number;
+  size: string;
+  paper_type: string;
+  price: number;
+};
+
+export type Album = {
+  id: number;
+  size: string;
+  page_count: number;
+  cover_type: string;
+  price: number;
+  description: string | null;
+};
+
+// --- NEW Order Types ---
+
+export type OrderedItem = {
+  type: 'frame' | 'print' | 'album';
+  id: number; // ID of the specific frame/print/album
+  size: string;
+  material?: string | null; // For frames
+  paper_type?: string; // For prints
+  cover_type?: string; // For albums
+  page_count?: number; // For albums
+  quantity: number;
+  price: number; // Price per item at time of order
+  line_total: number; // quantity * price
+};
+
+export type ProductOrder = {
+  id: number;
+  created_at: string;
+  order_id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_mobile: string | null;
+  ordered_items: OrderedItem[] | null; // Array of ordered items
+  total_amount: number;
+  status: string | null;
+};

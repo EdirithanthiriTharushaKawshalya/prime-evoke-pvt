@@ -1,3 +1,4 @@
+// src/app/[studioId]/services/page.tsx
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -7,14 +8,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
-import { supabase } from "@/lib/supabaseClient";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { createServerClient } from "@supabase/ssr"; // Use server client for data fetching
+import { cookies } from "next/headers";
 import Link from "next/link";
-import { Check } from "lucide-react";
-import { ServicePackage } from "@/lib/types";
+import { Check, Frame as FrameIcon, Printer, BookOpen } from "lucide-react"; // Added product icons
+import { ServicePackage, Frame, PrintSize, Album } from "@/lib/types"; // Import product types
 import { getStudioData } from "@/lib/data";
 
-// Helper function to group packages by category
+// Helper function to categorize service packages
 function categorizeServices(packages: ServicePackage[]) {
   const categorized: { [key: string]: ServicePackage[] } = {};
   for (const pkg of packages) {
@@ -29,6 +31,11 @@ function categorizeServices(packages: ServicePackage[]) {
   return Object.entries(categorized).sort((a, b) => a[0].localeCompare(b[0]));
 }
 
+// Helper to format currency
+const formatCurrency = (amount: number) => {
+  return `Rs. ${amount.toLocaleString('en-LK')}`; // Sri Lankan Rupee format
+}
+
 export default async function ServicesPage({
   params,
 }: {
@@ -36,37 +43,70 @@ export default async function ServicesPage({
 }) {
   const { studioId } = await params;
   const studioData = await getStudioData(studioId);
+  const cookieStore = cookies(); // Needed for server client
 
-  // Fetch all services for this studio
-  const { data, error } = await supabase
-    .from("services")
-    .select("*")
-    .eq("studio_name", studioData.name)
-    .order("category")
-    .order("id");
+  // Create Supabase client for server-side fetching
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        async getAll() {
+          return (await cookieStore).getAll();
+        },
+      },
+    }
+  );
 
-  const packages: ServicePackage[] | null = data;
+  // --- Fetch ALL Data Concurrently ---
+  const [
+    servicesResult,
+    framesResult,
+    printsResult,
+    albumsResult
+  ] = await Promise.all([
+    supabase
+      .from("services")
+      .select("*")
+      .eq("studio_name", studioData.name)
+      .order("category").order("id"),
+    supabase.from("frames").select("*").order("id"),
+    supabase.from("print_sizes").select("*").order("id"),
+    supabase.from("albums").select("*").order("id")
+  ]);
 
-  if (error || !packages) {
-    console.error("Error fetching services:", error);
-    return <p>Error loading services. Please try again later.</p>;
+  // --- Process Service Packages ---
+  const packages: ServicePackage[] = servicesResult.data || [];
+  if (servicesResult.error) {
+    console.error("Error fetching services:", servicesResult.error);
+    // Consider returning an error message, but continue to show products
   }
-
-  // Group packages by category
   const categorizedPackages = categorizeServices(packages);
+  const serviceCategories = categorizedPackages.map(([category]) => category);
 
-  // Handle case where there might be no packages
-  if (categorizedPackages.length === 0) {
+  // --- Process Products ---
+  const frames: Frame[] = framesResult.data || [];
+  const printSizes: PrintSize[] = printsResult.data || [];
+  const albums: Album[] = albumsResult.data || [];
+  const productCategories = ["Frames", "Prints", "Albums"]; // Define product tab names
+
+  // Combine all categories for tabs
+  const allCategories = [...serviceCategories, ...productCategories];
+  // Determine default tab (first service category or first product category)
+  const defaultTab = serviceCategories[0] || productCategories[0];
+
+  // Handle case where there might be no packages or products
+  if (allCategories.length === 0) {
     return (
       <div
         className="container mx-auto py-12 md:py-24 px-4 text-center"
         data-aos="fade-up" // Animate empty state too
       >
         <h1 className="text-4xl md:text-5xl font-bold tracking-tighter mb-4">
-          {studioData.name} Services & Packages
+          {studioData.name} Services & Products
         </h1>
         <p className="text-lg text-muted-foreground mt-2">
-          No packages available at this time. Please check back later.
+          No packages or products available at this time. Please check back later.
         </p>
       </div>
     );
@@ -75,28 +115,27 @@ export default async function ServicesPage({
   return (
     <div className="container mx-auto py-12 md:py-24 px-4">
       {/* Page Header */}
-      {/* 1. Added animation to header */}
       <section className="text-center mb-12 md:mb-16" data-aos="fade-up">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tighter">
-          {studioData.name} Services & Packages
+          {studioData.name} Services & Products
         </h1>
         <p className="text-lg text-muted-foreground mt-2 max-w-2xl mx-auto">
-          Choose the perfect package that fits your needs.
+          Explore our packages and product offerings.
         </p>
       </section>
 
-      {/* --- Tabbed Interface for Packages --- */}
-      {/* 2. Added animation to the main tabs section */}
+      {/* --- Tabbed Interface --- */}
       <section data-aos="fade-up" data-aos-delay="100">
-        <Tabs defaultValue={categorizedPackages[0]?.[0]} className="w-full">
-          {/* Add a wrapper div to center and control width */}
+        <Tabs defaultValue={defaultTab} className="w-full">
+          {/* Tabs List - dynamically create tabs for all categories */}
           <div className="flex justify-center mb-8">
-            <TabsList className="grid w-full max-w-lg grid-cols-2 md:grid-cols-4 bg-secondary p-1 rounded-full h-auto">
-              {categorizedPackages.map(([category]) => (
+            {/* Adjust max-width and grid-cols based on total number of tabs */}
+            <TabsList className="grid w-full max-w-4xl grid-cols-3 md:grid-cols-5 lg:grid-cols-8 bg-secondary p-1 rounded-full h-auto">
+              {allCategories.map((category) => (
                 <TabsTrigger
                   key={category}
                   value={category}
-                  className="rounded-full data-[state=active]:bg-[#2563eb] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground transition-colors duration-200"
+                  className="rounded-full data-[state=active]:bg-[#2563eb] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground transition-colors duration-200 text-xs md:text-sm" // Adjusted text size
                 >
                   {category}
                 </TabsTrigger>
@@ -104,31 +143,21 @@ export default async function ServicesPage({
             </TabsList>
           </div>
 
-          {/* Create the Tab Content Panels */}
+          {/* --- Tab Content Panels --- */}
+
+          {/* Service Package Panels */}
           {categorizedPackages.map(([category, categoryPackages]) => (
             <TabsContent key={category} value={category}>
-              {/* Grid for packages within this category */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {categoryPackages.map((pkg, index) => (
-                  // 3. Added animation to each card with staggered delay
-                  <div
-                    key={pkg.id}
-                    data-aos="fade-up"
-                    data-aos-delay={index * 100} // Stagger cards within tab
-                  >
+                  <div key={pkg.id} data-aos="fade-up" data-aos-delay={index * 100}>
                     <Card className="flex flex-col bg-card/80 h-full">
-                      {" "}
-                      {/* Added h-full for consistent height */}
                       <CardHeader>
-                        <CardTitle className="text-xl md:text-2xl">
-                          {pkg.name}
-                        </CardTitle>
+                        <CardTitle className="text-xl md:text-2xl">{pkg.name}</CardTitle>
                         <CardDescription>{pkg.description}</CardDescription>
                       </CardHeader>
                       <CardContent className="flex-1">
-                        <p className="text-2xl md:text-3xl font-bold mb-6">
-                          {pkg.price}
-                        </p>
+                        <p className="text-2xl md:text-3xl font-bold mb-6">{pkg.price}</p>
                         <ul className="space-y-3">
                           {pkg.features?.map((feature) => (
                             <li
@@ -160,6 +189,80 @@ export default async function ServicesPage({
               </div>
             </TabsContent>
           ))}
+
+          {/* --- Product Panels --- */}
+
+          {/* Frames Panel */}
+          <TabsContent key="Frames" value="Frames">
+            <Card className="bg-card/80 p-6 md:p-8">
+              <CardHeader className="p-0 mb-6 text-center">
+                 <CardTitle className="text-3xl flex items-center justify-center gap-2"><FrameIcon/> Frames</CardTitle>
+                 <CardDescription>High-quality frames to showcase your memories.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-sm">
+                {frames.map((frame, index) => (
+                  <div key={frame.id} data-aos="fade-up" data-aos-delay={index * 50} className="border rounded-md p-3 bg-background/50">
+                    <p className="font-semibold">{frame.size} {frame.material && `(${frame.material})`}</p>
+                    {frame.description && <p className="text-xs text-muted-foreground mt-1">{frame.description}</p>}
+                    <p className="font-medium mt-2">{formatCurrency(frame.price)}</p>
+                  </div>
+                ))}
+              </CardContent>
+               <CardFooter className="p-0 pt-6 justify-center">
+                   <Button asChild variant="outline">
+                       <Link href={`/${studioId}/book?tab=products`}>Order Frames</Link>
+                   </Button>
+               </CardFooter>
+            </Card>
+          </TabsContent>
+
+          {/* Prints Panel */}
+          <TabsContent key="Prints" value="Prints">
+            <Card className="bg-card/80 p-6 md:p-8">
+              <CardHeader className="p-0 mb-6 text-center">
+                 <CardTitle className="text-3xl flex items-center justify-center gap-2"><Printer/> Prints</CardTitle>
+                 <CardDescription>Professional quality photo prints in various sizes and finishes.</CardDescription>
+              </CardHeader>
+               <CardContent className="p-0 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-sm">
+                 {printSizes.map((print, index) => (
+                   <div key={print.id} data-aos="fade-up" data-aos-delay={index * 50} className="border rounded-md p-3 bg-background/50">
+                     <p className="font-semibold">{print.size} <span className="text-xs text-muted-foreground">({print.paper_type})</span></p>
+                     <p className="font-medium mt-2">{formatCurrency(print.price)}</p>
+                   </div>
+                 ))}
+               </CardContent>
+               <CardFooter className="p-0 pt-6 justify-center">
+                   <Button asChild variant="outline">
+                       <Link href={`/${studioId}/book?tab=products`}>Order Prints</Link>
+                   </Button>
+               </CardFooter>
+            </Card>
+          </TabsContent>
+
+          {/* Albums Panel */}
+          <TabsContent key="Albums" value="Albums">
+             <Card className="bg-card/80 p-6 md:p-8">
+               <CardHeader className="p-0 mb-6 text-center">
+                 <CardTitle className="text-3xl flex items-center justify-center gap-2"><BookOpen/> Albums</CardTitle>
+                 <CardDescription>Beautifully crafted albums to preserve your memories.</CardDescription>
+               </CardHeader>
+               <CardContent className="p-0 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                 {albums.map((album, index) => (
+                   <div key={album.id} data-aos="fade-up" data-aos-delay={index * 50} className="border rounded-md p-3 bg-background/50">
+                     <p className="font-semibold">{album.size} ({album.cover_type}, {album.page_count} Pages)</p>
+                     {album.description && <p className="text-xs text-muted-foreground mt-1">{album.description}</p>}
+                     <p className="font-medium mt-2">{formatCurrency(album.price)}</p>
+                   </div>
+                 ))}
+               </CardContent>
+                <CardFooter className="p-0 pt-6 justify-center">
+                   <Button asChild variant="outline">
+                       <Link href={`/${studioId}/book?tab=products`}>Order Albums</Link>
+                   </Button>
+               </CardFooter>
+             </Card>
+          </TabsContent>
+
         </Tabs>
       </section>
     </div>

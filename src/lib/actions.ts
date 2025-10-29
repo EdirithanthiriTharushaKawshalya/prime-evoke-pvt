@@ -4,7 +4,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail } from '@/lib/types';
+import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail, OrderedItem, ProductOrder } from '@/lib/types';
 
 // --- generateMonthlyReport function ---
 export async function generateMonthlyReport(month: string, year: string) {
@@ -43,31 +43,41 @@ export async function generateMonthlyReport(month: string, year: string) {
     const startDate = new Date(parseInt(year), parseInt(month) - 1, 1).toISOString();
     const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59).toISOString();
 
-    // Fetch bookings for the specific month
+    // --- Fetch Bookings (existing) ---
     const { data: bookings, error: bookingsError } = await supabase
       .from('client_bookings')
       .select('*')
-      .gte('event_date', startDate.split('T')[0])
+      .gte('event_date', startDate.split('T')[0]) // Note: This is event_date
       .lte('event_date', endDate.split('T')[0])
       .order('event_date', { ascending: true });
 
     if (bookingsError) throw bookingsError;
 
-    // Fetch all packages for price calculation
+    // --- NEW: Fetch Product Orders ---
+    const { data: productOrders, error: ordersError } = await supabase
+      .from('product_orders')
+      .select('*')
+      .gte('created_at', startDate) // Product orders use created_at
+      .lte('created_at', endDate)
+      .order('created_at', { ascending: true });
+      
+    if (ordersError) throw ordersError;
+
+    // --- Fetch Packages (existing) ---
     const { data: packages, error: packagesError } = await supabase
       .from('services')
       .select('*');
 
     if (packagesError) throw packagesError;
 
-    // Fetch team members for staff assignment tracking
+    // --- Fetch Team Members (existing) ---
     const { data: teamMembers, error: membersError } = await supabase
       .from('team_members')
       .select('*');
 
     if (membersError) throw membersError;
 
-    // ✅ CRITICAL FIX: Fetch financial entries for these bookings
+    // --- Process Bookings with Financials (existing) ---
     let bookingsWithFinancial: Booking[] = [];
     if (bookings && bookings.length > 0) {
       const bookingIds = bookings.map(b => b.id);
@@ -77,39 +87,37 @@ export async function generateMonthlyReport(month: string, year: string) {
         .in('booking_id', bookingIds);
 
       if (!financialError && financialEntries) {
-        // Map financial entries to bookings
-        bookingsWithFinancial = bookings.map(booking => ({
-          ...booking,
-          financial_entry: financialEntries.find(fe => fe.booking_id === booking.id) || null
-        })) as Booking[];
-
-        // ✅ NEW: Fetch photographer financial details for these bookings
         const { data: photographerDetails, error: photographerError } = await supabase
           .from('photographer_financial_details')
           .select('*')
           .in('booking_id', bookingIds);
 
         if (!photographerError && photographerDetails) {
-          // Map photographer details to bookings
-          bookingsWithFinancial = bookingsWithFinancial.map(booking => ({
+          bookingsWithFinancial = bookings.map(booking => ({
             ...booking,
             financial_entry: booking.financial_entry ? {
               ...booking.financial_entry,
               photographer_details: photographerDetails.filter(detail => detail.booking_id === booking.id)
             } : null
           })) as Booking[];
+        } else {
+            bookingsWithFinancial = bookings.map(booking => ({
+                ...booking,
+                financial_entry: financialEntries.find(fe => fe.booking_id === booking.id) || null
+            })) as Booking[];
         }
       } else {
         bookingsWithFinancial = bookings as Booking[];
       }
     }
 
-    // Generate Excel report with the updated bookings data
+    // --- Generate Excel Report ---
     const { generateMonthlyExcelReport } = await import('@/lib/excelExport');
     const excelBlob = await generateMonthlyExcelReport({
       bookings: bookingsWithFinancial || [],
       packages: packages || [],
       teamMembers: teamMembers || [],
+      productOrders: productOrders || [], // Pass product orders to excel
       month,
       year
     });
@@ -795,4 +803,129 @@ export async function getPhotographerMonthlyEarnings(month: string, year: string
     console.error("Error fetching photographer earnings:", error);
     return { error: "Failed to fetch photographer earnings" };
   }
+}
+
+// --- NEW: Submit Product Order ---
+export async function submitProductOrder(formData: {
+    customer_name: string;
+    customer_email: string;
+    customer_mobile: string | null;
+    ordered_items: OrderedItem[];
+    total_amount: number;
+}) {
+    const cookieStore = await cookies();
+
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return cookieStore.get(name)?.value;
+                },
+            },
+        }
+    );
+
+    // Optional: Add authentication check if needed, but assuming public order for now
+
+    // Generate a unique Order ID
+    const generateOrderId = (): string => {
+        const timestamp = Date.now().toString(36);
+        const random = Math.random().toString(36).substring(2, 8);
+        return `ORD-${timestamp}-${random}`.toUpperCase();
+    };
+
+    const orderId = generateOrderId();
+
+    try {
+        const { data, error } = await supabase
+            .from('product_orders')
+            .insert([{
+                order_id: orderId,
+                customer_name: formData.customer_name,
+                customer_email: formData.customer_email,
+                customer_mobile: formData.customer_mobile,
+                ordered_items: formData.ordered_items,
+                total_amount: formData.total_amount,
+                status: 'New', // Changed from 'Pending' to 'New'
+            }])
+            .select('id, order_id') // Select the generated ID and order_id
+            .single();
+
+        if (error) throw error;
+
+        revalidatePath('/admin/bookings'); // Revalidate admin page if needed
+        return { success: true, orderId: data?.order_id }; // Return success and the order ID
+
+    } catch (error: unknown) {
+        console.error("Product order submission error:", error);
+        const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+        return { error: message };
+    }
+}
+
+// --- NEW: updateProductOrderStatus function ---
+export async function updateProductOrderStatus(
+  orderId: number,
+  newStatus: string
+) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can update status." };
+  }
+
+  // --- THIS IS THE FIX ---
+  // The valid statuses must match your new dropdown
+  const validStatuses = ["New", "Contacted", "Confirmed", "Completed", "Cancelled"];
+  if (!validStatuses.includes(newStatus)) {
+    return { error: "Invalid status value." };
+  }
+
+  // Perform the database update
+  const { error: updateError } = await supabase
+    .from('product_orders')
+    .update({ status: newStatus })
+    .eq('id', orderId);
+
+  if (updateError) {
+    console.error("Error updating order status:", updateError);
+    return { error: updateError.message };
+  }
+
+  // Revalidate the path to refresh data on the admin page
+  revalidatePath('/admin/bookings');
+  return { success: true };
 }

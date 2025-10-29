@@ -1,10 +1,11 @@
 // lib/excelExport.ts - Full updated file
-import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail } from './types';
+import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail, ProductOrder, OrderedItem } from './types';
 
 export interface MonthlyReportData {
   bookings: Booking[];
   packages: ServicePackage[];
   teamMembers: TeamMember[];
+  productOrders: ProductOrder[];
   month: string;
   year: string;
 }
@@ -34,7 +35,7 @@ interface FinancialStats {
 }
 
 export async function generateMonthlyExcelReport(data: MonthlyReportData): Promise<Blob> {
-  const { bookings, packages, month, year } = data;
+  const { bookings, packages, month, year, productOrders } = data;
   
   // Calculate analytics
   const packageStats = calculatePackageStats(bookings, packages);
@@ -51,6 +52,11 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateBookingDetailsSheet(bookings, packages)), 
     'Booking Details'
+  );
+  // NEW: Add Product Orders sheet
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet(generateProductOrdersSheet(productOrders)), 
+    'Product Orders'
   );
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generatePackageAnalyticsSheet(packageStats)), 
@@ -262,8 +268,6 @@ function generateStaffPerformanceSheet(staffStats: StaffStats): (string | number
   return [headers, ...data];
 }
 
-// REMOVED: generateStaffRevenueSheet function completely
-
 // NEW: Generate Photographer Earnings Sheet (without Average Per Event column)
 function generatePhotographerEarningsSheet(bookings: Booking[]): (string | number)[][] {
   const headers = [
@@ -428,4 +432,85 @@ function generateFinancialSummarySheet(totalIncome: number, month: string, year:
 
 function getMonthName(month: number): string {
   return new Date(2000, month - 1, 1).toLocaleString('default', { month: 'long' });
+}
+
+// --- NEW: generateProductOrdersSheet function ---
+function generateProductOrdersSheet(productOrders: ProductOrder[]): (string | number)[][] {
+  const headers = [
+    'Order ID', 'Order Date', 'Customer Name', 'Customer Email', 'Customer Mobile', 
+    'Order Status', 'Item Type', 'Item Details', 'Quantity', 'Item Price', 'Line Total', 'Order Total'
+  ];
+  
+  if (!productOrders || productOrders.length === 0) {
+    return [
+      ['Product Orders'],
+      [''],
+      ['No product orders found for this period.']
+    ];
+  }
+
+  const data: (string | number)[][] = [];
+  let grandTotal = 0;
+
+  productOrders.forEach(order => {
+    grandTotal += order.total_amount;
+    
+    if (order.ordered_items && order.ordered_items.length > 0) {
+      order.ordered_items.forEach((item, index) => {
+        // Format item details
+        let details = `${item.size}`;
+        if (item.type === 'frame' && item.material) details += `, ${item.material}`;
+        if (item.type === 'print' && item.paper_type) details += `, ${item.paper_type}`;
+        if (item.type === 'album') details += `, ${item.cover_type}, ${item.page_count} Pages`;
+
+        data.push([
+          // Order info (only on the first item row for clarity)
+          index === 0 ? order.order_id : '',
+          index === 0 ? new Date(order.created_at).toLocaleDateString() : '',
+          index === 0 ? order.customer_name : '',
+          index === 0 ? order.customer_email : '',
+          index === 0 ? order.customer_mobile || 'N/A' : '',
+          index === 0 ? order.status || 'Pending' : '',
+          
+          // Item info
+          item.type,
+          details,
+          item.quantity,
+          `Rs. ${item.price.toLocaleString()}`,
+          `Rs. ${item.line_total.toLocaleString()}`,
+          
+          // Order total (only on the first item row)
+          index === 0 ? `Rs. ${order.total_amount.toLocaleString()}` : '',
+        ]);
+      });
+    } else {
+      // Order with no items? (Shouldn't happen, but good to handle)
+      data.push([
+        order.order_id,
+        new Date(order.created_at).toLocaleDateString(),
+        order.customer_name,
+        order.customer_email,
+        order.customer_mobile || 'N/A',
+        order.status || 'Pending',
+        'No items found',
+        '',
+        0,
+        'Rs. 0',
+        'Rs. 0',
+        `Rs. ${order.total_amount.toLocaleString()}`,
+      ]);
+    }
+  });
+
+  // Add summary row
+  data.push(
+    [''],
+    [
+      'SUMMARY', '', '', '', '', '', '', '', '', '', 
+      'Total Revenue:', 
+      `Rs. ${grandTotal.toLocaleString()}`
+    ]
+  );
+
+  return [headers, ...data];
 }

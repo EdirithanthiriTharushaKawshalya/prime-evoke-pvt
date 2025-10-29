@@ -4,11 +4,13 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BookingCard } from "@/components/ui/BookingCard";
 import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
-import { Booking, Profile, TeamMember, ServicePackage, FinancialEntry, PhotographerFinancialDetail } from "@/lib/types";
+import { Booking, Profile, TeamMember, ServicePackage, FinancialEntry, PhotographerFinancialDetail, ProductOrder } from "@/lib/types";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProductOrderCard } from "@/components/ui/ProductOrderCard";
 
 // Helper function to group bookings by month
 const groupBookingsByMonth = (bookings: Booking[]) => {
@@ -24,6 +26,20 @@ const groupBookingsByMonth = (bookings: Booking[]) => {
     acc[monthYear].push(booking);
     return acc;
   }, {} as Record<string, Booking[]>);
+};
+
+// --- NEW: Helper function to group product orders by month ---
+const groupProductOrdersByMonth = (orders: ProductOrder[]) => {
+  return orders.reduce((acc, order) => {
+    const groupDate = new Date(order.created_at);
+    const monthYear = new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "long",
+    }).format(groupDate);
+    if (!acc[monthYear]) acc[monthYear] = [];
+    acc[monthYear].push(order);
+    return acc;
+  }, {} as Record<string, ProductOrder[]>);
 };
 
 // Main Async Server Component
@@ -167,6 +183,20 @@ export default async function AdminBookingsPage() {
       }
     }
   }
+  
+  // --- NEW: Fetch Product Orders ---
+  let productOrders: ProductOrder[] = [];
+  const { data: productOrderData, error: productOrderError } = await supabase
+    .from("product_orders")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (productOrderError) {
+    fetchError = (fetchError || "") + " " + productOrderError.message;
+    console.error("Error fetching product orders:", productOrderError);
+  } else if (productOrderData) {
+    productOrders = productOrderData as ProductOrder[];
+  }
 
   // --- Fetch Available Staff ---
   let assignableMembers: TeamMember[] = [];
@@ -191,7 +221,7 @@ export default async function AdminBookingsPage() {
   const groupedBookings = groupBookingsByMonth(bookings);
   const now = new Date();
 
-  const sortedMonths = Object.keys(groupedBookings).sort((a, b) => {
+  const sortedBookingMonths = Object.keys(groupedBookings).sort((a, b) => {
     const dateA = new Date(a);
     const dateB = new Date(b);
     const isAFuture =
@@ -206,6 +236,12 @@ export default async function AdminBookingsPage() {
     if (!isAFuture && isBFuture) return 1;
     return dateB.getTime() - dateA.getTime();
   });
+  
+  // --- NEW: Group and Sort Product Orders ---
+  const groupedProductOrders = groupProductOrdersByMonth(productOrders);
+  const sortedOrderMonths = Object.keys(groupedProductOrders).sort((a, b) => {
+    return new Date(b).getTime() - new Date(a).getTime(); // Simple descending sort
+  });
 
   // --- Render ---
   return (
@@ -215,9 +251,9 @@ export default async function AdminBookingsPage() {
       <div className="container mx-auto py-10 px-4">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Client Bookings</h1>
+            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Manage all client inquiries with unique tracking IDs
+              Manage client bookings and product orders
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -232,39 +268,83 @@ export default async function AdminBookingsPage() {
 
         {fetchError && (
           <p className="text-destructive">
-            Error loading bookings: {fetchError}
+            Error loading data: {fetchError}
           </p>
         )}
-        {!fetchError && bookings.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-muted-foreground text-lg">No bookings found.</div>
-            <p className="text-sm text-muted-foreground mt-2">
-              When clients submit inquiries through your studio websites, they will appear here.
-            </p>
-          </div>
-        )}
 
-        {sortedMonths.map((monthYear) => (
-          <div key={monthYear} className="mb-12">
-            <h2 className="text-2xl font-semibold mb-6 border-b pb-2">
-              {monthYear}
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                ({groupedBookings[monthYear].length} bookings)
-              </span>
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {groupedBookings[monthYear].map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  userRole={userRole}
-                  availableStaff={availableStaff}
-                  packages={packages}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+        {/* --- NEW: Tabbed Interface --- */}
+        <Tabs defaultValue="bookings" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-8">
+            <TabsTrigger value="bookings">Client Bookings</TabsTrigger>
+            <TabsTrigger value="products">Product Orders</TabsTrigger>
+          </TabsList>
+
+          {/* --- Bookings Tab --- */}
+          <TabsContent value="bookings">
+            {!fetchError && bookings.length === 0 && (
+              <div className="text-center py-12">
+                <div className="text-muted-foreground text-lg">No bookings found.</div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  When clients submit inquiries through your studio websites, they will appear here.
+                </p>
+              </div>
+            )}
+
+            {sortedBookingMonths.map((monthYear) => (
+              <div key={monthYear} className="mb-12">
+                <h2 className="text-2xl font-semibold mb-6 border-b pb-2">
+                  {monthYear}
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    ({groupedBookings[monthYear].length} bookings)
+                  </span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {groupedBookings[monthYear].map((booking) => (
+                    <BookingCard
+                      key={booking.id}
+                      booking={booking}
+                      userRole={userRole}
+                      availableStaff={availableStaff}
+                      packages={packages}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </TabsContent>
+
+          {/* --- Product Orders Tab --- */}
+          <TabsContent value="products">
+            {!fetchError && productOrders.length === 0 && (
+              <div className="text-center py-12">
+                <div className="text-muted-foreground text-lg">No product orders found.</div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  When clients purchase products, they will appear here.
+                </p>
+              </div>
+            )}
+
+            {sortedOrderMonths.map((monthYear) => (
+              <div key={monthYear} className="mb-12">
+                <h2 className="text-2xl font-semibold mb-6 border-b pb-2">
+                  {monthYear}
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    ({groupedProductOrders[monthYear].length} orders)
+                  </span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {groupedProductOrders[monthYear].map((order) => (
+                    <ProductOrderCard
+                      key={order.id}
+                      order={order}
+                      userRole={userRole}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </TabsContent>
+        </Tabs>
       </div>
       <Footer />
     </div>

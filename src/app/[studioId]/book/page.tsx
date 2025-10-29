@@ -1,9 +1,9 @@
 // app/[studioId]/book/page.tsx - Full updated file
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams, useParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useEffect, useState, useMemo } from "react";
+import { useSearchParams, useParams, useRouter } from "next/navigation";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,26 +11,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
+  Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage
 } from "@/components/ui/form";
-import { ServicePackage } from "@/lib/types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { ServicePackage, Frame, PrintSize, Album, OrderedItem } from "@/lib/types";
 import { toast } from "sonner";
-import { CheckCircle, Copy, Calendar, Phone } from "lucide-react";
+import { CheckCircle, Copy, Calendar, Phone, ShoppingCart, Info, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { submitProductOrder } from "@/lib/actions";
 
-// --- 1. Define Form Schema with Zod ---
+// --- Schemas ---
 const bookingSchema = z.object({
   full_name: z
     .string()
@@ -50,13 +44,29 @@ const bookingSchema = z.object({
   message: z.string().optional(),
 });
 
-// --- 2. Main Booking Component ---
+const productOrderSchema = z.object({
+    customer_name: z.string().min(2, "Name required"),
+    customer_email: z.string().email("Invalid email"),
+    customer_mobile: z.string().min(10, "Valid mobile number required").optional().or(z.literal('')),
+    frames: z.array(z.object({ id: z.string(), quantity: z.number().min(0) })).optional(),
+    prints: z.array(z.object({ id: z.string(), quantity: z.number().min(0) })).optional(),
+    albums: z.array(z.object({ id: z.string(), quantity: z.number().min(0) })).optional(),
+}).refine(data =>
+    (data.frames?.some(f => f.quantity > 0) ||
+     data.prints?.some(p => p.quantity > 0) ||
+     data.albums?.some(a => a.quantity > 0)),
+    { message: "Please add at least one item to your order.", path: ["frames"] }
+);
+
+// --- Main Component ---
 export default function BookingPage() {
   const searchParams = useSearchParams();
   const params = useParams();
+  const router = useRouter();
 
   const prefilledPackage = searchParams.get("package");
   const prefilledCategory = searchParams.get("category");
+  const initialTab = searchParams.get("tab") || "session";
   const studioId = params.studioId as string;
 
   // Derive studio name for display and filtering
@@ -66,6 +76,7 @@ export default function BookingPage() {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
+  // --- State ---
   const [eventTypes] = useState<string[]>([
     "Wedding",
     "Birthday",
@@ -73,11 +84,13 @@ export default function BookingPage() {
     "Portrait",
   ]);
   const [packages, setPackages] = useState<ServicePackage[]>([]);
-  const [selectedEventType, setSelectedEventType] = useState<
-    string | undefined
-  >(prefilledCategory || undefined);
+  const [selectedEventType, setSelectedEventType] = useState<string | undefined>(prefilledCategory || undefined);
+  const [frames, setFrames] = useState<Frame[]>([]);
+  const [printSizes, setPrintSizes] = useState<PrintSize[]>([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [productFetchError, setProductFetchError] = useState<string | null>(null);
   const [submittedInquiry, setSubmittedInquiry] = useState<{
-    id: string;
+    id: number;
     inquiryId: string;
     full_name: string;
     email: string;
@@ -86,9 +99,12 @@ export default function BookingPage() {
     package_name: string;
     studio_slug: string;
   } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedOrder, setSubmittedOrder] = useState<{ orderId: string; totalAmount: number; items: OrderedItem[] } | null>(null);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
-  const form = useForm<z.infer<typeof bookingSchema>>({
+  // --- Forms ---
+  const bookingForm = useForm<z.infer<typeof bookingSchema>>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
       full_name: "",
@@ -101,7 +117,25 @@ export default function BookingPage() {
     },
   });
 
-  // --- 3. Fetch Packages when Event Type Changes ---
+  const productForm = useForm<z.infer<typeof productOrderSchema>>({
+      resolver: zodResolver(productOrderSchema),
+      defaultValues: { 
+        customer_name: "", 
+        customer_email: "", 
+        customer_mobile: "", 
+        frames: [], 
+        prints: [], 
+        albums: [] 
+      },
+  });
+
+  // --- Field Arrays for Products ---
+  const { fields: frameFields } = useFieldArray({ control: productForm.control, name: "frames" });
+  const { fields: printFields } = useFieldArray({ control: productForm.control, name: "prints" });
+  const { fields: albumFields } = useFieldArray({ control: productForm.control, name: "albums" });
+
+  // --- Fetch Data ---
+  // Fetch Service Packages (existing useEffect)
   useEffect(() => {
     async function fetchPackages() {
       if (!selectedEventType || prefilledCategory) {
@@ -118,7 +152,7 @@ export default function BookingPage() {
       if (data) {
         setPackages(data as ServicePackage[]);
         if (prefilledPackage && !prefilledCategory) {
-          form.setValue("package_name", prefilledPackage);
+          bookingForm.setValue("package_name", prefilledPackage);
         }
       } else {
         console.error("Error fetching packages:", error);
@@ -136,21 +170,86 @@ export default function BookingPage() {
   }, [
     selectedEventType,
     studioName,
-    form,
+    bookingForm,
     prefilledCategory,
     prefilledPackage,
   ]);
 
-  // --- 4. Generate Unique Inquiry ID ---
+  // Fetch Products (Frames, Prints, Albums) - runs once
+  useEffect(() => {
+      async function fetchProducts() {
+          try {
+              const [framesRes, printsRes, albumsRes] = await Promise.all([
+                  supabase.from("frames").select("*").order("id"),
+                  supabase.from("print_sizes").select("*").order("id"),
+                  supabase.from("albums").select("*").order("id")
+              ]);
+              if (framesRes.error) throw framesRes.error;
+              if (printsRes.error) throw printsRes.error;
+              if (albumsRes.error) throw albumsRes.error;
+              
+              // Just set the state
+              setFrames(framesRes.data as Frame[]);
+              setPrintSizes(printsRes.data as PrintSize[]);
+              setAlbums(albumsRes.data as Album[]);
+
+          } catch (error: any) {
+              console.error("Error fetching products:", error);
+              setProductFetchError("Could not load product options. Please try again later.");
+              toast.error("Error loading products", { description: error.message });
+          }
+      }
+      fetchProducts();
+  }, []); // Empty dependency array runs once
+
+  // ** THIS IS THE CRITICAL FIX **
+  // Re-populate form arrays when product data loads
+  useEffect(() => {
+      // Only run this if frames are fetched but field array is still empty
+      if (frames.length > 0 && frameFields.length === 0) {
+          // Keep existing customer data if they already typed
+          const customerData = productForm.getValues(); 
+          
+          productForm.reset({
+              customer_name: customerData.customer_name,
+              customer_email: customerData.customer_email,
+              customer_mobile: customerData.customer_mobile,
+              frames: frames.map(f => ({ id: String(f.id), quantity: 0 })),
+              prints: printSizes.map(p => ({ id: String(p.id), quantity: 0 })),
+              albums: albums.map(a => ({ id: String(a.id), quantity: 0 })),
+          });
+      }
+      // This effect depends on the fetched data and the form's state
+  }, [frames, printSizes, albums, frameFields.length, productForm]);
+
+  // --- Calculate Order Total ---
+  const watchFrames = productForm.watch("frames");
+  const watchPrints = productForm.watch("prints");
+  const watchAlbums = productForm.watch("albums");
+
+  // Calculate the total directly. 
+  // The 'watch' functions trigger a re-render, so this will always be current.
+  let orderTotal = 0;
+  watchFrames?.forEach((item, index) => {
+    orderTotal += (item.quantity || 0) * (frames[index]?.price || 0);
+  });
+  watchPrints?.forEach((item, index) => {
+    orderTotal += (item.quantity || 0) * (printSizes[index]?.price || 0);
+  });
+  watchAlbums?.forEach((item, index) => {
+    orderTotal += (item.quantity || 0) * (albums[index]?.price || 0);
+  });
+
+  // --- Generate Unique Inquiry ID ---
   function generateInquiryId(): string {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substring(2, 8);
     return `INQ-${timestamp}-${random}`.toUpperCase();
   }
 
-  // --- 5. Handle Form Submission ---
-  async function onSubmit(values: z.infer<typeof bookingSchema>) {
-    setIsSubmitting(true);
+  // --- Submission Handlers ---
+  async function onBookingSubmit(values: z.infer<typeof bookingSchema>) {
+    setIsSubmittingBooking(true);
     
     const inquiryId = generateInquiryId();
     const submissionData = {
@@ -159,7 +258,7 @@ export default function BookingPage() {
       package_name: prefilledPackage || values.package_name,
       studio_slug: studioId,
       status: "New",
-      inquiry_id: inquiryId, // Add the unique inquiry ID
+      inquiry_id: inquiryId,
     };
 
     try {
@@ -193,11 +292,89 @@ export default function BookingPage() {
         error instanceof Error ? error.message : "Please try again.";
       toast.error("Submission Failed", { description: errorMessage });
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingBooking(false);
     }
   }
 
-  // --- 6. Copy Inquiry ID to Clipboard ---
+  async function onProductOrderSubmit(values: z.infer<typeof productOrderSchema>) {
+    setIsSubmittingOrder(true);
+    const orderedItems: OrderedItem[] = [];
+
+    // Compile ordered items list
+    values.frames?.forEach((item, index) => {
+        if (item.quantity > 0 && frames[index]) {
+            const frame = frames[index];
+            orderedItems.push({
+                type: 'frame', 
+                id: frame.id, 
+                size: frame.size, 
+                material: frame.material,
+                quantity: item.quantity, 
+                price: frame.price, 
+                line_total: item.quantity * frame.price
+            });
+        }
+    });
+
+    values.prints?.forEach((item, index) => {
+        if (item.quantity > 0 && printSizes[index]) {
+            const print = printSizes[index];
+            orderedItems.push({
+                type: 'print', 
+                id: print.id, 
+                size: print.size, 
+                paper_type: print.paper_type,
+                quantity: item.quantity, 
+                price: print.price, 
+                line_total: item.quantity * print.price
+            });
+        }
+    });
+
+    values.albums?.forEach((item, index) => {
+        if (item.quantity > 0 && albums[index]) {
+            const album = albums[index];
+            orderedItems.push({
+                type: 'album', 
+                id: album.id, 
+                size: album.size, 
+                cover_type: album.cover_type,
+                page_count: album.page_count,
+                quantity: item.quantity, 
+                price: album.price, 
+                line_total: item.quantity * album.price
+            });
+        }
+    });
+
+    const submissionData = {
+        customer_name: values.customer_name,
+        customer_email: values.customer_email,
+        customer_mobile: values.customer_mobile || null,
+        ordered_items: orderedItems,
+        total_amount: orderTotal
+    };
+
+    // Call Server Action
+    const result = await submitProductOrder(submissionData);
+
+    if (result.error) {
+        toast.error("Order Failed", { description: result.error });
+    } else if (result.success && result.orderId) {
+         setSubmittedOrder({ 
+           orderId: result.orderId, 
+           totalAmount: orderTotal, 
+           items: orderedItems 
+         });
+         toast.success("Order Placed Successfully!", { 
+           description: `Your Order ID: ${result.orderId}` 
+         });
+         productForm.reset(); // Reset form
+    }
+    setIsSubmittingOrder(false);
+  }
+
+  // --- Copy Inquiry ID to Clipboard ---
   const copyInquiryId = async () => {
     if (submittedInquiry) {
       try {
@@ -209,15 +386,40 @@ export default function BookingPage() {
     }
   };
 
-  // --- 7. Reset Form and Start New Inquiry ---
+  // --- Copy Order ID to Clipboard ---
+  const copyOrderId = async () => {
+    if (submittedOrder) {
+      try {
+        await navigator.clipboard.writeText(submittedOrder.orderId);
+        toast.success("Order ID copied to clipboard!");
+      } catch {
+        toast.error("Failed to copy to clipboard");
+      }
+    }
+  };
+
+  // --- Reset / New Inquiry/Order ---
   const startNewInquiry = () => {
     setSubmittedInquiry(null);
-    form.reset();
+    bookingForm.reset();
     if (!prefilledCategory) setSelectedEventType(undefined);
     if (!prefilledPackage) setPackages([]);
   };
 
-  // --- 8. Render Confirmation Screen ---
+  const startNewOrder = () => {
+      setSubmittedOrder(null);
+      // Reset the form, repopulating the product arrays
+      productForm.reset({
+          customer_name: "",
+          customer_email: "",
+          customer_mobile: "",
+          frames: frames.map(f => ({ id: String(f.id), quantity: 0 })),
+          prints: printSizes.map(p => ({ id: String(p.id), quantity: 0 })),
+          albums: albums.map(a => ({ id: String(a.id), quantity: 0 })),
+      });
+  };
+
+  // --- Render Confirmation Screens ---
   if (submittedInquiry) {
     return (
       <div className="container mx-auto py-16 px-4 max-w-2xl">
@@ -316,212 +518,522 @@ export default function BookingPage() {
     );
   }
 
-  // --- 9. Render the Booking Form ---
+  if (submittedOrder) {
+    return (
+      <div className="container mx-auto py-16 px-4 max-w-2xl">
+        <Card className="border-blue-600/30 bg-gradient-to-br from-blue-900/20 to-cyan-900/10 backdrop-blur-sm">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <CheckCircle className="h-16 w-16 text-blue-400" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-blue-100">
+              Order Placed Successfully!
+            </CardTitle>
+            <CardDescription className="text-lg text-blue-200/80">
+              Thank you for your order from {studioName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Order ID Section */}
+            <div className="bg-black/30 rounded-lg border border-blue-600/30 p-4 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-blue-200/80">
+                  Your Order ID:
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyOrderId}
+                  className="flex items-center gap-2 bg-blue-900/30 border-blue-600/50 text-blue-100 hover:bg-blue-800/40 hover:border-blue-500/70"
+                >
+                  <Copy className="h-3 w-3" />
+                  Copy
+                </Button>
+              </div>
+              <div className="bg-black/40 rounded px-3 py-2 font-mono text-lg font-bold text-blue-300 border border-blue-600/30">
+                {submittedOrder.orderId}
+              </div>
+              <p className="text-xs text-blue-200/60 mt-2">
+                Please save this ID for order tracking
+              </p>
+            </div>
+
+            {/* Order Summary */}
+            <div className="bg-black/20 rounded-lg p-4 border border-white/10">
+              <h3 className="font-semibold text-blue-200 mb-3">Order Summary</h3>
+              <div className="space-y-2">
+                {submittedOrder.items.map((item, index) => (
+                  <div key={index} className="flex justify-between text-sm">
+                    <span className="text-white">
+                      {item.quantity}x {item.size} {item.type}
+                      {item.material && ` (${item.material})`}
+                      {item.paper_type && ` (${item.paper_type})`}
+                      {item.cover_type && ` (${item.cover_type})`}
+                    </span>
+                    <span className="text-blue-300">
+                      Rs. {item.line_total.toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-white/20 mt-3 pt-3 flex justify-between text-lg font-bold">
+                <span className="text-blue-200">Total:</span>
+                <span className="text-blue-300">Rs. {submittedOrder.totalAmount.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Next Steps */}
+            <div className="bg-green-900/20 rounded-lg border border-green-600/30 p-4 backdrop-blur-sm">
+              <h3 className="font-semibold text-green-200 mb-2">What&apos;s Next?</h3>
+              <ul className="text-sm text-green-200/80 space-y-1">
+                <li>• We&apos;ll process your order and contact you within 24 hours</li>
+                <li>• Keep your order ID handy for order tracking</li>
+                <li>• You&apos;ll receive updates on your order status via email</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              <Button 
+                onClick={startNewOrder} 
+                variant="outline" 
+                className="flex-1 bg-transparent border-blue-600/50 text-blue-100 hover:bg-blue-900/30 hover:border-blue-500/70"
+              >
+                Place Another Order
+              </Button>
+              <Button asChild className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+                <a href={`/${studioId}`}>Return to Studio</a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // --- Render Tabs and Forms ---
   return (
-    <div className="container mx-auto py-16 px-4 max-w-2xl">
-      <h1 className="text-3xl font-bold text-center mb-2 text-white">Book Your Session</h1>
-      <p className="text-center text-muted-foreground mb-8">
-        Submit an inquiry for {studioName}
-      </p>
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-6 bg-card/60 backdrop-blur-sm p-6 md:p-8 rounded-lg border border-white/10 shadow-lg"
-        >
-          {/* --- Full Name --- */}
-          <FormField
-            control={form.control}
-            name="full_name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white">Full Name</FormLabel>
-                <FormControl>
-                  <Input 
-                    placeholder="Enter your full name" 
-                    {...field} 
-                    className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+    <div className="container mx-auto py-16 px-4 max-w-3xl">
+        <Tabs defaultValue={initialTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+                <TabsTrigger value="session">Book a Session</TabsTrigger>
+                <TabsTrigger value="products">Order Products</TabsTrigger>
+            </TabsList>
 
-          {/* --- Email --- */}
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white">Email Address</FormLabel>
-                <FormControl>
-                  <Input
-                    type="email"
-                    placeholder="Enter your email"
-                    {...field}
-                    className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* --- Mobile Number --- */}
-          <FormField
-            control={form.control}
-            name="mobile_number"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white">Mobile Number</FormLabel>
-                <FormControl>
-                  <Input
-                    type="tel"
-                    placeholder="Enter your mobile number"
-                    {...field}
-                    className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* --- Event Type Dropdown (conditionally shown) --- */}
-          {!prefilledCategory && (
-            <FormField
-              control={form.control}
-              name="event_type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Event Type</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      setSelectedEventType(value);
-                      form.setValue("package_name", "");
-                    }}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="bg-black/30 border-white/20 text-white">
-                        <SelectValue placeholder="Select event type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-gray-900 border-white/20 text-white">
-                      {eventTypes.map((type) => (
-                        <SelectItem key={type} value={type} className="hover:bg-gray-800">
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-
-          {/* --- Package Dropdown (conditionally shown/enabled) --- */}
-          {!prefilledPackage && selectedEventType && (
-            <FormField
-              control={form.control}
-              name="package_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Package</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={packages.length === 0}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="bg-black/30 border-white/20 text-white">
-                        <SelectValue
-                          placeholder={
-                            packages.length > 0
-                              ? "Select package"
-                              : "Select event type first"
-                          }
+            {/* --- Session Booking Tab --- */}
+            <TabsContent value="session">
+                <h1 className="text-3xl font-bold text-center mb-2 text-white">Book Your Session</h1>
+                <p className="text-center text-muted-foreground mb-8">Submit an inquiry for {studioName}</p>
+                <Form {...bookingForm}>
+                    <form onSubmit={bookingForm.handleSubmit(onBookingSubmit)} className="space-y-6 bg-card/60 backdrop-blur-sm p-6 md:p-8 rounded-lg border border-white/10 shadow-lg">
+                        {/* --- Full Name --- */}
+                        <FormField
+                          control={bookingForm.control}
+                          name="full_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Full Name</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Enter your full name" 
+                                  {...field} 
+                                  className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-gray-900 border-white/20 text-white">
-                      {packages.map((pkg) => (
-                        <SelectItem key={pkg.id} value={pkg.name || ""} className="hover:bg-gray-800">
-                          {pkg.name} - {pkg.price}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
 
-          {/* --- Show prefilled info if applicable --- */}
-          {prefilledCategory && (
-            <div className="space-y-1 rounded-md border border-white/20 p-3 bg-black/30">
-              <p className="text-sm font-medium text-green-200">Event Type:</p>
-              <p className="text-white">{prefilledCategory}</p>
-            </div>
-          )}
-          {prefilledPackage && (
-            <div className="space-y-1 rounded-md border border-white/20 p-3 bg-black/30">
-              <p className="text-sm font-medium text-green-200">Selected Package:</p>
-              <p className="text-white">{prefilledPackage}</p>
-            </div>
-          )}
+                        {/* --- Email --- */}
+                        <FormField
+                          control={bookingForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Email Address</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="email"
+                                  placeholder="Enter your email"
+                                  {...field}
+                                  className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-          {/* --- Event Date --- */}
-          <FormField
-            control={form.control}
-            name="event_date"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white">Preferred Event Date</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="date" 
-                    {...field} 
-                    className="bg-black/30 border-white/20 text-white"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                        {/* --- Mobile Number --- */}
+                        <FormField
+                          control={bookingForm.control}
+                          name="mobile_number"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Mobile Number</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="tel"
+                                  placeholder="Enter your mobile number"
+                                  {...field}
+                                  className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-          {/* --- Message --- */}
-          <FormField
-            control={form.control}
-            name="message"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white">Additional Message (Optional)</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Tell us a bit more about your event or any special requests."
-                    className="resize-none bg-black/30 border-white/20 text-white placeholder:text-gray-400"
-                    rows={4}
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                        {/* --- Event Type Dropdown (conditionally shown) --- */}
+                        {!prefilledCategory && (
+                          <FormField
+                            control={bookingForm.control}
+                            name="event_type"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-white">Event Type</FormLabel>
+                                <Select
+                                  onValueChange={(value) => {
+                                    field.onChange(value);
+                                    setSelectedEventType(value);
+                                    bookingForm.setValue("package_name", "");
+                                  }}
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="bg-black/30 border-white/20 text-white">
+                                      <SelectValue placeholder="Select event type" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="bg-gray-900 border-white/20 text-white">
+                                    {eventTypes.map((type) => (
+                                      <SelectItem key={type} value={type} className="hover:bg-gray-800">
+                                        {type}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
 
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isSubmitting ? "Submitting..." : "Submit Inquiry"}
-          </Button>
-        </form>
-      </Form>
+                        {/* --- Package Dropdown (conditionally shown/enabled) --- */}
+                        {!prefilledPackage && selectedEventType && (
+                          <FormField
+                            control={bookingForm.control}
+                            name="package_name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-white">Package</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                  disabled={packages.length === 0}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="bg-black/30 border-white/20 text-white">
+                                      <SelectValue
+                                        placeholder={
+                                          packages.length > 0
+                                            ? "Select package"
+                                            : "Select event type first"
+                                        }
+                                      />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="bg-gray-900 border-white/20 text-white">
+                                    {packages.map((pkg) => (
+                                      <SelectItem key={pkg.id} value={pkg.name || ""} className="hover:bg-gray-800">
+                                        {pkg.name} - {pkg.price}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+
+                        {/* --- Show prefilled info if applicable --- */}
+                        {prefilledCategory && (
+                          <div className="space-y-1 rounded-md border border-white/20 p-3 bg-black/30">
+                            <p className="text-sm font-medium text-green-200">Event Type:</p>
+                            <p className="text-white">{prefilledCategory}</p>
+                          </div>
+                        )}
+                        {prefilledPackage && (
+                          <div className="space-y-1 rounded-md border border-white/20 p-3 bg-black/30">
+                            <p className="text-sm font-medium text-green-200">Selected Package:</p>
+                            <p className="text-white">{prefilledPackage}</p>
+                          </div>
+                        )}
+
+                        {/* --- Event Date --- */}
+                        <FormField
+                          control={bookingForm.control}
+                          name="event_date"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Preferred Event Date</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="date" 
+                                  {...field} 
+                                  className="bg-black/30 border-white/20 text-white"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* --- Message --- */}
+                        <FormField
+                          control={bookingForm.control}
+                          name="message"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Additional Message (Optional)</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Tell us a bit more about your event or any special requests."
+                                  className="resize-none bg-black/30 border-white/20 text-white placeholder:text-gray-400"
+                                  rows={4}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <Button
+                          type="submit"
+                          disabled={isSubmittingBooking}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          {isSubmittingBooking ? "Submitting..." : "Submit Inquiry"}
+                        </Button>
+                    </form>
+                </Form>
+            </TabsContent>
+
+            {/* --- Product Order Tab --- */}
+            <TabsContent value="products">
+                <h1 className="text-3xl font-bold text-center mb-2 text-white">Order Products</h1>
+                <p className="text-center text-muted-foreground mb-8">Select frames, prints, or albums for purchase.</p>
+                 {productFetchError && <p className="text-destructive text-center mb-4">{productFetchError}</p>}
+                <Form {...productForm}>
+                     <form onSubmit={productForm.handleSubmit(onProductOrderSubmit)} className="space-y-8 bg-card/60 backdrop-blur-sm p-6 md:p-8 rounded-lg border border-white/10 shadow-lg">
+                         {/* Customer Details */}
+                         <div className="space-y-4">
+                             <FormField 
+                               control={productForm.control} 
+                               name="customer_name" 
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel className="text-white">Full Name</FormLabel>
+                                   <FormControl>
+                                     <Input 
+                                       placeholder="Enter your full name" 
+                                       {...field} 
+                                       className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
+                             <FormField 
+                               control={productForm.control} 
+                               name="customer_email" 
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel className="text-white">Email Address</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="email"
+                                       placeholder="Enter your email"
+                                       {...field}
+                                       className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
+                             <FormField 
+                               control={productForm.control} 
+                               name="customer_mobile" 
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel className="text-white">Mobile Number (Optional)</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="tel"
+                                       placeholder="Enter your mobile number"
+                                       {...field}
+                                       className="bg-black/30 border-white/20 text-white placeholder:text-gray-400"
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
+                         </div>
+
+                         {/* Frames Section */}
+                         {frames.length > 0 && (
+                            <Card className="bg-black/30 border-white/10">
+                              <CardHeader>
+                                <CardTitle className="text-white flex items-center gap-2">
+                                  <ShoppingCart className="h-5 w-5" />
+                                  Frames
+                                </CardTitle>
+                                <CardDescription className="text-gray-400">
+                                  Select quantities for frame orders
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent className="space-y-3">
+                                {frameFields.map((field, index) => (
+                                  <div key={field.id} className="flex items-center justify-between gap-4">
+                                    <Label className="flex-1 text-sm text-white">
+                                      {frames[index]?.size} {frames[index]?.material && `(${frames[index]?.material})`}
+                                    </Label>
+                                    <span className="text-sm text-muted-foreground w-20 text-right">
+                                      Rs. {frames[index]?.price.toLocaleString()}
+                                    </span>
+                                    <FormField 
+                                      control={productForm.control} 
+                                      name={`frames.${index}.quantity`} 
+                                      render={({ field: qtyField }) => (
+                                        <Input 
+                                          type="number" 
+                                          min="0" 
+                                          {...qtyField} 
+                                          onChange={e => qtyField.onChange(parseInt(e.target.value) || 0)} 
+                                          className="w-20 h-8 text-sm bg-black/50 border-white/20 text-white"
+                                        />
+                                      )}
+                                    />
+                                  </div>
+                                ))}
+                              </CardContent>
+                            </Card>
+                         )}
+
+                         {/* Prints Section */}
+                         {printSizes.length > 0 && (
+                            <Card className="bg-black/30 border-white/10">
+                              <CardHeader>
+                                <CardTitle className="text-white flex items-center gap-2">
+                                  <ShoppingCart className="h-5 w-5" />
+                                  Prints
+                                </CardTitle>
+                                <CardDescription className="text-gray-400">
+                                  Select quantities for print orders
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent className="space-y-3">
+                                {printFields.map((field, index) => (
+                                  <div key={field.id} className="flex items-center justify-between gap-4">
+                                    <Label className="flex-1 text-sm text-white">
+                                      {printSizes[index]?.size} {printSizes[index]?.paper_type && `(${printSizes[index]?.paper_type})`}
+                                    </Label>
+                                    <span className="text-sm text-muted-foreground w-20 text-right">
+                                      Rs. {printSizes[index]?.price.toLocaleString()}
+                                    </span>
+                                    <FormField 
+                                      control={productForm.control} 
+                                      name={`prints.${index}.quantity`} 
+                                      render={({ field: qtyField }) => (
+                                        <Input 
+                                          type="number" 
+                                          min="0" 
+                                          {...qtyField} 
+                                          onChange={e => qtyField.onChange(parseInt(e.target.value) || 0)} 
+                                          className="w-20 h-8 text-sm bg-black/50 border-white/20 text-white"
+                                        />
+                                      )}
+                                    />
+                                  </div>
+                                ))}
+                              </CardContent>
+                            </Card>
+                         )}
+
+                         {/* Albums Section */}
+                         {albums.length > 0 && (
+                            <Card className="bg-black/30 border-white/10">
+                              <CardHeader>
+                                <CardTitle className="text-white flex items-center gap-2">
+                                  <ShoppingCart className="h-5 w-5" />
+                                  Albums
+                                </CardTitle>
+                                <CardDescription className="text-gray-400">
+                                  Select quantities for album orders
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent className="space-y-3">
+                                {albumFields.map((field, index) => (
+                                  <div key={field.id} className="flex items-center justify-between gap-4">
+                                    <Label className="flex-1 text-sm text-white">
+                                      {albums[index]?.size} {albums[index]?.cover_type && `(${albums[index]?.cover_type})`} - {albums[index]?.page_count} pages
+                                    </Label>
+                                    <span className="text-sm text-muted-foreground w-20 text-right">
+                                      Rs. {albums[index]?.price.toLocaleString()}
+                                    </span>
+                                    <FormField 
+                                      control={productForm.control} 
+                                      name={`albums.${index}.quantity`} 
+                                      render={({ field: qtyField }) => (
+                                        <Input 
+                                          type="number" 
+                                          min="0" 
+                                          {...qtyField} 
+                                          onChange={e => qtyField.onChange(parseInt(e.target.value) || 0)} 
+                                          className="w-20 h-8 text-sm bg-black/50 border-white/20 text-white"
+                                        />
+                                      )}
+                                    />
+                                  </div>
+                                ))}
+                              </CardContent>
+                            </Card>
+                         )}
+
+                         {/* Order Total */}
+                         <Card className="bg-blue-900/20 border-blue-600/30">
+                           <CardContent className="pt-6">
+                             <div className="flex justify-between items-center">
+                               <span className="text-lg font-semibold text-blue-200">Order Total:</span>
+                               <span className="text-2xl font-bold text-blue-300">
+                                 Rs. {orderTotal.toLocaleString()}
+                               </span>
+                             </div>
+                           </CardContent>
+                         </Card>
+
+                         {/* Submit Button */}
+                         <Button
+                           type="submit"
+                           disabled={isSubmittingOrder || orderTotal === 0}
+                           className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                         >
+                           {isSubmittingOrder ? "Placing Order..." : "Place Order"}
+                         </Button>
+                         {productForm.formState.errors.frames && (
+                           <p className="text-sm font-medium text-destructive text-center">
+                             {productForm.formState.errors.frames.message}
+                           </p>
+                         )}
+                     </form>
+                </Form>
+            </TabsContent>
+        </Tabs>
     </div>
   );
 }
