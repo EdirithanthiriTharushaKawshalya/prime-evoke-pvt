@@ -703,9 +703,9 @@ export default function BookingPage() {
   return (
     <div className="container mx-auto py-16 px-4 max-w-3xl">
       <Tabs defaultValue={initialTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8">
-          <TabsTrigger value="session">Book a Session</TabsTrigger>
-          <TabsTrigger value="products">Order Products</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 mb-8 rounded-full">
+          <TabsTrigger value="session" className="rounded-full">Book a Session</TabsTrigger>
+          <TabsTrigger value="products" className="rounded-full">Order Products</TabsTrigger>
         </TabsList>
 
         {/* --- Session Booking Tab --- */}
@@ -1325,7 +1325,7 @@ export default function BookingPage() {
               <Button
                 type="submit"
                 disabled={isSubmittingOrder || orderTotal === 0}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full bg-green-600 hover:bg-blue-700 text-white"
               >
                 {isSubmittingOrder
                   ? "Placing Order..."
