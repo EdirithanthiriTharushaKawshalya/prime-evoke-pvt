@@ -16,6 +16,8 @@ import { Check, Frame as FrameIcon, Printer, BookOpen } from "lucide-react"; // 
 import { ServicePackage, Frame, PrintSize, Album } from "@/lib/types"; // Import product types
 import { getStudioData } from "@/lib/data";
 
+export const revalidate = 300; // Re-fetch data every 300 seconds (5 minutes)
+
 // Helper function to categorize service packages
 function categorizeServices(packages: ServicePackage[]) {
   const categorized: { [key: string]: ServicePackage[] } = {};
