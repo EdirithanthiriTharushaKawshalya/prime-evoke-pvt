@@ -2,15 +2,16 @@
 "use client";
 
 import { useState } from "react";
-import { ProductOrder, OrderedItem } from "@/lib/types";
+import { ProductOrder } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, Mail, Phone, ShoppingCart, DollarSign, Camera } from "lucide-react";
+import { User, Mail, Phone, ShoppingCart, DollarSign, Camera, Edit } from "lucide-react";
 import { UpdateProductOrderStatus } from "./UpdateProductOrderStatus";
 import { AssignProductOrderPhotographers } from "./AssignProductOrderPhotographers";
 import { ProductOrderFinancialDialog } from "./ProductOrderFinancialDialog";
-import { Button } from "./button";
 import { DeleteProductOrderButton } from "./DeleteProductOrderButton";
+import { EditProductOrderDialog } from "./EditProductOrderDialog";
+import { Button } from "./button";
 
 interface ProductOrderCardProps {
   order: ProductOrder;
@@ -21,10 +22,10 @@ interface ProductOrderCardProps {
 // Helper to format currency
 const formatCurrency = (amount: number) => {
   return `Rs. ${amount.toLocaleString('en-LK')}`;
-}
+};
 
 // Helper to format item details
-const formatItemDetails = (item: OrderedItem) => {
+const formatItemDetails = (item: any) => {
   let details = `${item.size}`;
   if (item.type === 'frame' && item.material) details += `, ${item.material}`;
   if (item.type === 'print' && item.paper_type) details += `, ${item.paper_type}`;
@@ -34,6 +35,7 @@ const formatItemDetails = (item: OrderedItem) => {
 
 export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrderCardProps) {
   const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not specified";
@@ -179,6 +181,14 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setIsEditDialogOpen(true)}
+              >
+                <Edit className="h-3 w-3 mr-1" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setIsFinancialDialogOpen(true)}
               >
                 <DollarSign className="h-3 w-3 mr-1" />
@@ -199,6 +209,15 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
         </CardContent>
       </Card>
       
+      {/* Edit Dialog */}
+      {userRole === "management" && (
+        <EditProductOrderDialog
+          order={order}
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+        />
+      )}
+
       {/* Financial Dialog */}
       {userRole === "management" && (
         <ProductOrderFinancialDialog

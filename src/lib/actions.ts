@@ -1252,3 +1252,64 @@ export async function getProductOrderFinancialEntries(orderIds: number[]) {
 
   return { financialEntries };
 }
+
+// --- NEW: updateProductOrder function ---
+export async function updateProductOrder(
+  orderId: number,
+  updates: {
+    customer_name?: string;
+    customer_email?: string;
+    customer_mobile?: string;
+  }
+) {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can update product orders." };
+  }
+
+  // Perform the update
+  const { error: updateError } = await supabase
+    .from('product_orders')
+    .update(updates)
+    .eq('id', orderId);
+
+  if (updateError) {
+    console.error("Error updating product order:", updateError);
+    return { error: updateError.message };
+  }
+
+  // NO revalidatePath needed, router.refresh() will handle it
+  return { success: true };
+}
