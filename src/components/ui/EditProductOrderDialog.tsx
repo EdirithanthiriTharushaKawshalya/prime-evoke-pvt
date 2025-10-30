@@ -84,7 +84,7 @@ export function EditProductOrderDialog({ order, open, onOpenChange }: EditProduc
         <DialogHeader>
           <DialogTitle>Edit Product Order</DialogTitle>
           <DialogDescription>
-            Update the customer details for this order. Click save when you're done.
+            Update the customer details for this order. Click save when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>

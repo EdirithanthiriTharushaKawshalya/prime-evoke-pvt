@@ -1,12 +1,11 @@
 // actions.ts - Full updated file
 "use server";
 
-import { CookieOptions, createServerClient } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { 
   Booking, 
-  TeamMember, 
   PhotographerFinancialDetail, 
   OrderedItem, 
   ProductOrder,
@@ -1376,7 +1375,7 @@ export async function generateMySalaryReport(month: string, year: string) {
 
     if (pError) throw pError;
 
-    if (bookingEarnings.length === 0 && productEarnings.length === 0) {
+    if (bookingEarnings?.length === 0 && productEarnings?.length === 0) {
       return { error: `No earnings data found for your profile for ${month}/${year}.` };
     }
 
@@ -1400,8 +1399,9 @@ export async function generateMySalaryReport(month: string, year: string) {
       fileName: `Salary-Report-${userName.replace(' ', '-')}-${month}-${year}.xlsx`
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating user salary report:", error);
-    return { error: "Failed to generate report: " + error.message };
+    const message = error instanceof Error ? error.message : "An unexpected error occurred";
+    return { error: `Failed to generate report: ${message}` };
   }
 }

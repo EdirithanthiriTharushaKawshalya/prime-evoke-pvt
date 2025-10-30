@@ -19,13 +19,25 @@ interface ProductOrderCardProps {
   availableStaff: { id: string; full_name: string }[];
 }
 
+// Define proper types for ordered items
+interface OrderedItem {
+  size: string;
+  type: string;
+  material?: string;
+  paper_type?: string;
+  cover_type?: string;
+  page_count?: number;
+  quantity: number;
+  line_total: number;
+}
+
 // Helper to format currency
 const formatCurrency = (amount: number) => {
   return `Rs. ${amount.toLocaleString('en-LK')}`;
 };
 
-// Helper to format item details
-const formatItemDetails = (item: any) => {
+// Helper to format item details with proper typing
+const formatItemDetails = (item: OrderedItem) => {
   let details = `${item.size}`;
   if (item.type === 'frame' && item.material) details += `, ${item.material}`;
   if (item.type === 'print' && item.paper_type) details += `, ${item.paper_type}`;
@@ -128,7 +140,7 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
                       {item.quantity}x
                     </span>{" "}
                     <Badge variant="secondary" className="text-xs capitalize mr-1">{item.type}</Badge>
-                    {formatItemDetails(item)}
+                    {formatItemDetails(item as OrderedItem)}
                   </div>
                   <span className="font-medium text-foreground">
                     {formatCurrency(item.line_total)}
