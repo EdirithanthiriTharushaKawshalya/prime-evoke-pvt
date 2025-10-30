@@ -674,3 +674,100 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[])
 
   return [headers, ...data];
 }
+// --- NEW: generateUserSalaryReport function ---
+// This interface defines the data we expect
+export interface UserSalaryData {
+  bookingEarnings: any[]; // Will contain joined data
+  productEarnings: any[]; // Will contain joined data
+  userName: string;
+  month: string; // <-- ADDED
+  year: string;  // <-- ADDED
+}
+
+export async function generateUserSalaryReport(data: UserSalaryData): Promise<Blob> {
+  // Get all data, including month and year
+  const { bookingEarnings, productEarnings, userName, month, year } = data;
+
+  const XLSX = await import('xlsx');
+  const workbook = XLSX.utils.book_new();
+
+  let totalBookingEarnings = 0;
+  let totalProductEarnings = 0;
+
+  // 1. Create Booking Earnings Sheet
+  const bookingHeaders = ['Inquiry ID', 'Event Date', 'Amount'];
+  const bookingData = bookingEarnings.map(item => {
+    totalBookingEarnings += item.amount;
+    return [
+      item.booking?.inquiry_id || 'N/A',
+      item.booking?.event_date ? new Date(item.booking.event_date).toLocaleDateString() : 'N/A',
+      `Rs. ${item.amount.toLocaleString()}`
+    ];
+  });
+  
+  // Add message if no data
+  if(bookingData.length === 0) {
+    bookingData.push(['No booking earnings found for this period.']);
+  }
+  
+  bookingData.push(['', '', '']);
+  bookingData.push(
+    ['Total Booking Earnings:', '', `Rs. ${totalBookingEarnings.toLocaleString()}`]
+  );
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet([bookingHeaders, ...bookingData]), 
+    'Booking Earnings'
+  );
+
+  // 2. Create Product Commission Sheet
+  const productHeaders = ['Order ID', 'Order Date', 'Amount'];
+  const productData = productEarnings.map(item => {
+    totalProductEarnings += item.amount;
+    return [
+      item.order?.order_id || 'N/A',
+      item.order?.created_at ? new Date(item.order.created_at).toLocaleDateString() : 'N/A',
+      `Rs. ${item.amount.toLocaleString()}`
+    ];
+  });
+
+  // Add message if no data
+  if(productData.length === 0) {
+    productData.push(['No product commissions found for this period.']);
+  }
+
+  productData.push(['', '', '']);
+  productData.push(
+    ['Total Product Commission:', '', `Rs. ${totalProductEarnings.toLocaleString()}`]
+  );
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet([productHeaders, ...productData]), 
+    'Product Commission'
+  );
+  
+  // 3. Create Summary Sheet
+  const grandTotal = totalBookingEarnings + totalProductEarnings;
+  const summaryHeaders = ['Item', 'Amount'];
+  const summaryData = [
+    ['User:', userName],
+    // Add the report period
+    ['Report Period:', `${getMonthName(parseInt(month))} ${year}`], 
+    ['', ''],
+    ['Total Booking Earnings', `Rs. ${totalBookingEarnings.toLocaleString()}`],
+    ['Total Product Commission', `Rs. ${totalProductEarnings.toLocaleString()}`],
+    ['', ''],
+    ['GRAND TOTAL', `Rs. ${grandTotal.toLocaleString()}`]
+  ];
+  
+  // Make sure the main workbook always has the Summary sheet first
+  const summarySheet = XLSX.utils.aoa_to_sheet([summaryHeaders, ...summaryData]);
+  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+
+  // Re-order sheets to put Summary first
+  workbook.SheetNames.unshift(workbook.SheetNames.pop() as string);
+
+  // Convert to Excel blob
+  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  return new Blob([excelBuffer], { 
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+  });
+}

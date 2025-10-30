@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BookingCard } from "@/components/ui/BookingCard";
 import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
+import { MySalaryDownloadButton } from "@/components/ui/MySalaryDownloadButton"; // <-- Import added
 import { 
   Booking, 
   Profile, 
@@ -263,6 +264,7 @@ export default async function AdminBookingsPage() {
           </div>
           <div className="flex items-center gap-4">
             <ReportDownloadButton userRole={userRole} />
+            <MySalaryDownloadButton /> {/* Button added */}
             <LogoutButton />
           </div>
         </div>
