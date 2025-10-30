@@ -1,5 +1,5 @@
 // lib/excelExport.ts - Full updated file
-import { Booking, ServicePackage, TeamMember, FinancialEntry, PhotographerFinancialDetail, ProductOrder, OrderedItem, ProductOrderFinancialEntry } from './types';
+import { Booking, ServicePackage, TeamMember, ProductOrder } from './types';
 
 export interface MonthlyReportData {
   bookings: Booking[];
@@ -42,8 +42,7 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
   const staffStats = calculateStaffStats(bookings, packages);
   const categoryStats = calculateCategoryStats(bookings);
   const totalIncome = calculateTotalIncome(bookings, packages);
-  const financialStats = calculateFinancialStats(bookings);
-
+  
   // Create Excel workbook structure
   const XLSX = await import('xlsx');
   const workbook = XLSX.utils.book_new();
@@ -257,7 +256,7 @@ function generateBookingDetailsSheet(bookings: Booking[], packages: ServicePacka
 function generatePackageAnalyticsSheet(packageStats: PackageStats): (string | number)[][] {
   const headers = ['Package Name', 'Booking Count', 'Total Revenue'];
   const data = Object.entries(packageStats)
-    .filter(([_, stats]) => stats.count > 0) // Only show packages with bookings
+    .filter(([pkgName, stats]) => stats.count > 0) // Only show packages with bookings
     .map(([pkgName, stats]) => [
       pkgName,
       stats.count,
@@ -674,11 +673,28 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[])
 
   return [headers, ...data];
 }
+
 // --- NEW: generateUserSalaryReport function ---
 // This interface defines the data we expect
+interface BookingEarningItem {
+  amount: number;
+  booking?: {
+    inquiry_id?: string;
+    event_date?: string;
+  };
+}
+
+interface ProductEarningItem {
+  amount: number;
+  order?: {
+    order_id?: string;
+    created_at?: string;
+  };
+}
+
 export interface UserSalaryData {
-  bookingEarnings: any[]; // Will contain joined data
-  productEarnings: any[]; // Will contain joined data
+  bookingEarnings: BookingEarningItem[];
+  productEarnings: ProductEarningItem[];
   userName: string;
   month: string; // <-- ADDED
   year: string;  // <-- ADDED
