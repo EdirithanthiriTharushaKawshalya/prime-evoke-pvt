@@ -5,12 +5,12 @@ import { redirect } from "next/navigation";
 import { BookingCard } from "@/components/ui/BookingCard";
 import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
 import { MySalaryDownloadButton } from "@/components/ui/MySalaryDownloadButton"; // <-- Import added
-import { 
-  Booking, 
-  Profile, 
-  TeamMember, 
-  ServicePackage, 
-  ProductOrder 
+import {
+  Booking,
+  Profile,
+  TeamMember,
+  ServicePackage,
+  ProductOrder,
 } from "@/lib/types";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -111,9 +111,7 @@ export default async function AdminBookingsPage() {
 
   // --- Fetch Packages ---
   let packages: ServicePackage[] = [];
-  const { data: packagesData } = await supabase
-    .from("services")
-    .select("*");
+  const { data: packagesData } = await supabase.from("services").select("*");
   if (packagesData) {
     packages = packagesData as ServicePackage[];
   }
@@ -134,35 +132,42 @@ export default async function AdminBookingsPage() {
     bookings = bookingData as Booking[];
 
     // Now, fetch financial entries for these bookings
-    const bookingIds = bookings.map(b => b.id);
+    const bookingIds = bookings.map((b) => b.id);
     if (bookingIds.length > 0) {
       const { data: financialEntries, error: financialError } = await supabase
-        .from('financial_entries')
-        .select('*')
-        .in('booking_id', bookingIds);
+        .from("financial_entries")
+        .select("*")
+        .in("booking_id", bookingIds);
 
       // And fetch photographer details
-      const { data: photographerDetails, error: photographerError } = await supabase
-        .from('photographer_financial_details')
-        .select('*')
-        .in('booking_id', bookingIds);
+      const { data: photographerDetails, error: photographerError } =
+        await supabase
+          .from("photographer_financial_details")
+          .select("*")
+          .in("booking_id", bookingIds);
 
       // Now, map them together
-      bookings = bookings.map(booking => {
-        const financialEntry = financialError ? null : financialEntries?.find(fe => fe.booking_id === booking.id);
-        const photographerDetailsForBooking = photographerError ? [] : photographerDetails?.filter(pd => pd.booking_id === booking.id);
-        
+      bookings = bookings.map((booking) => {
+        const financialEntry = financialError
+          ? null
+          : financialEntries?.find((fe) => fe.booking_id === booking.id);
+        const photographerDetailsForBooking = photographerError
+          ? []
+          : photographerDetails?.filter((pd) => pd.booking_id === booking.id);
+
         return {
           ...booking,
-          financial_entry: financialEntry ? {
-            ...financialEntry,
-            photographer_details: photographerDetailsForBooking
-          } : null
+          financial_entry: financialEntry
+            ? {
+                ...financialEntry,
+                photographer_details: photographerDetailsForBooking,
+              }
+            : null,
         };
       }) as Booking[];
     }
   }
-  
+
   // --- Fetch Product Orders (Sequential Method) ---
   let productOrders: ProductOrder[] = [];
   const { data: productOrderData, error: productOrderError } = await supabase
@@ -177,30 +182,38 @@ export default async function AdminBookingsPage() {
     productOrders = productOrderData as ProductOrder[];
 
     // Now, fetch financial entries for these orders
-    const orderIds = productOrders.map(o => o.id);
+    const orderIds = productOrders.map((o) => o.id);
     if (orderIds.length > 0) {
-      const { data: poFinancialEntries, error: poFinancialError } = await supabase
-        .from('product_order_financial_entries')
-        .select('*')
-        .in('order_id', orderIds);
+      const { data: poFinancialEntries, error: poFinancialError } =
+        await supabase
+          .from("product_order_financial_entries")
+          .select("*")
+          .in("order_id", orderIds);
 
       // And fetch photographer commission details
-      const { data: poPhotographerDetails, error: poPhotographerError } = await supabase
-        .from('product_order_photographer_commission')
-        .select('*')
-        .in('order_id', orderIds);
-      
+      const { data: poPhotographerDetails, error: poPhotographerError } =
+        await supabase
+          .from("product_order_photographer_commission")
+          .select("*")
+          .in("order_id", orderIds);
+
       // Now, map them together
-      productOrders = productOrders.map(order => {
-        const financialEntry = poFinancialError ? null : poFinancialEntries?.find(fe => fe.order_id === order.id);
-        const photographerDetailsForOrder = poPhotographerError ? [] : poPhotographerDetails?.filter(pd => pd.order_id === order.id);
+      productOrders = productOrders.map((order) => {
+        const financialEntry = poFinancialError
+          ? null
+          : poFinancialEntries?.find((fe) => fe.order_id === order.id);
+        const photographerDetailsForOrder = poPhotographerError
+          ? []
+          : poPhotographerDetails?.filter((pd) => pd.order_id === order.id);
 
         return {
           ...order,
-          financial_entry: financialEntry ? {
-            ...financialEntry,
-            photographer_details: photographerDetailsForOrder
-          } : null
+          financial_entry: financialEntry
+            ? {
+                ...financialEntry,
+                photographer_details: photographerDetailsForOrder,
+              }
+            : null,
         };
       }) as ProductOrder[];
     }
@@ -219,10 +232,12 @@ export default async function AdminBookingsPage() {
     assignableMembers = membersData as TeamMember[];
   }
 
-  const availableStaff = assignableMembers.filter((m) => m.name).map(m => ({ 
-    id: String(m.id), 
-    full_name: m.name 
-  }));
+  const availableStaff = assignableMembers
+    .filter((m) => m.name)
+    .map((m) => ({
+      id: String(m.id),
+      full_name: m.name,
+    }));
 
   // --- Grouping and Sorting ---
   const groupedBookings = groupBookingsByMonth(bookings);
@@ -243,7 +258,7 @@ export default async function AdminBookingsPage() {
     if (!isAFuture && isBFuture) return 1;
     return dateB.getTime() - dateA.getTime();
   });
-  
+
   const groupedProductOrders = groupProductOrdersByMonth(productOrders);
   const sortedOrderMonths = Object.keys(groupedProductOrders).sort((a, b) => {
     return new Date(b).getTime() - new Date(a).getTime(); // Simple descending sort
@@ -251,110 +266,118 @@ export default async function AdminBookingsPage() {
 
   // --- Render ---
   return (
-    <div className="relative min-h-screen flex flex-col" data-aos="fade-up">
+    <div>
       <AnimatedBackground />
-      <Header />
-      <div className="container mx-auto py-10 px-4">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage client bookings and product orders
-            </p>
+      <div className="relative min-h-screen flex flex-col" data-aos="fade-up">
+        <Header />
+        <div className="container mx-auto py-10 px-4">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage client bookings and product orders
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <ReportDownloadButton userRole={userRole} />
+              <MySalaryDownloadButton /> {/* Button added */}
+              <LogoutButton />
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <ReportDownloadButton userRole={userRole} />
-            <MySalaryDownloadButton /> {/* Button added */}
-            <LogoutButton />
-          </div>
-        </div>
 
-        <p className="mb-8 text-muted-foreground">
-          Viewing as: {userRole} ({userName})
-        </p>
-
-        {fetchError && (
-          <p className="text-destructive">
-            Error loading data: {fetchError}
+          <p className="mb-8 text-muted-foreground">
+            Viewing as: {userRole} ({userName})
           </p>
-        )}
 
-        {/* --- Tabbed Interface --- */}
-        <Tabs defaultValue="bookings" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-8 rounded-full">
-            <TabsTrigger value="bookings" className="rounded-full">Client Bookings</TabsTrigger>
-            <TabsTrigger value="products" className="rounded-full">Product Orders</TabsTrigger>
-          </TabsList>
+          {fetchError && (
+            <p className="text-destructive">Error loading data: {fetchError}</p>
+          )}
 
-          {/* --- Bookings Tab --- */}
-          <TabsContent value="bookings">
-            {!fetchError && bookings.length === 0 && (
-              <div className="text-center py-12">
-                <div className="text-muted-foreground text-lg">No bookings found.</div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  When clients submit inquiries, they will appear here.
-                </p>
-              </div>
-            )}
+          {/* --- Tabbed Interface --- */}
+          <Tabs defaultValue="bookings" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-8 rounded-full">
+              <TabsTrigger value="bookings" className="rounded-full">
+                Client Bookings
+              </TabsTrigger>
+              <TabsTrigger value="products" className="rounded-full">
+                Product Orders
+              </TabsTrigger>
+            </TabsList>
 
-            {sortedBookingMonths.map((monthYear) => (
-              <div key={monthYear} className="mb-12">
-                <h2 className="text-2xl font-semibold mb-6 border-b pb-2">
-                  {monthYear}
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    ({groupedBookings[monthYear].length} bookings)
-                  </span>
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {groupedBookings[monthYear].map((booking) => (
-                    <BookingCard
-                      key={booking.id}
-                      booking={booking}
-                      userRole={userRole}
-                      availableStaff={availableStaff}
-                      packages={packages}
-                    />
-                  ))}
+            {/* --- Bookings Tab --- */}
+            <TabsContent value="bookings">
+              {!fetchError && bookings.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-muted-foreground text-lg">
+                    No bookings found.
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    When clients submit inquiries, they will appear here.
+                  </p>
                 </div>
-              </div>
-            ))}
-          </TabsContent>
+              )}
 
-          {/* --- Product Orders Tab --- */}
-          <TabsContent value="products">
-            {!fetchError && productOrders.length === 0 && (
-              <div className="text-center py-12">
-                <div className="text-muted-foreground text-lg">No product orders found.</div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  When clients purchase products, they will appear here.
-                </p>
-              </div>
-            )}
-
-            {sortedOrderMonths.map((monthYear) => (
-              <div key={monthYear} className="mb-12">
-                <h2 className="text-2xl font-semibold mb-6 border-b pb-2">
-                  {monthYear}
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    ({groupedProductOrders[monthYear].length} orders)
-                  </span>
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {groupedProductOrders[monthYear].map((order) => (
-                    <ProductOrderCard
-                      key={order.id}
-                      order={order}
-                      userRole={userRole}
-                      availableStaff={availableStaff} // <-- Correctly passing staff
-                    />
-                  ))}
+              {sortedBookingMonths.map((monthYear) => (
+                <div key={monthYear} className="mb-12">
+                  <h2 className="text-2xl font-semibold mb-6 border-b pb-2">
+                    {monthYear}
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      ({groupedBookings[monthYear].length} bookings)
+                    </span>
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {groupedBookings[monthYear].map((booking) => (
+                      <BookingCard
+                        key={booking.id}
+                        booking={booking}
+                        userRole={userRole}
+                        availableStaff={availableStaff}
+                        packages={packages}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </TabsContent>
-        </Tabs>
+              ))}
+            </TabsContent>
+
+            {/* --- Product Orders Tab --- */}
+            <TabsContent value="products">
+              {!fetchError && productOrders.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-muted-foreground text-lg">
+                    No product orders found.
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    When clients purchase products, they will appear here.
+                  </p>
+                </div>
+              )}
+
+              {sortedOrderMonths.map((monthYear) => (
+                <div key={monthYear} className="mb-12">
+                  <h2 className="text-2xl font-semibold mb-6 border-b pb-2">
+                    {monthYear}
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      ({groupedProductOrders[monthYear].length} orders)
+                    </span>
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {groupedProductOrders[monthYear].map((order) => (
+                      <ProductOrderCard
+                        key={order.id}
+                        order={order}
+                        userRole={userRole}
+                        availableStaff={availableStaff} // <-- Correctly passing staff
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </TabsContent>
+          </Tabs>
+        </div>
+        <Footer />
       </div>
-      <Footer />
     </div>
   );
 }
