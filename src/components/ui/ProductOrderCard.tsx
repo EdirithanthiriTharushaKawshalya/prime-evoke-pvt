@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { User, Mail, Phone, ShoppingCart, DollarSign, Camera, Edit } from "lucide-react";
 import { UpdateProductOrderStatus } from "./UpdateProductOrderStatus";
 import { AssignProductOrderPhotographers } from "./AssignProductOrderPhotographers";
-import { ProductOrderFinancialDialog } from "./ProductOrderFinancialDialog";
+// 1. Import the payload type
+import { ProductOrderFinancialDialog, FinancialSuccessPayload } from "./ProductOrderFinancialDialog";
 import { DeleteProductOrderButton } from "./DeleteProductOrderButton";
 import { EditProductOrderDialog } from "./EditProductOrderDialog";
 import { Button } from "./button";
@@ -46,24 +47,20 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
   const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
-  // Local state for optimistic updates
   const [currentOrder, setCurrentOrder] = useState<ProductOrder>(order);
 
-  // Sync with server data when router.refresh() completes
   useEffect(() => {
     setCurrentOrder(order);
   }, [order]);
 
-  // Handler to update local state immediately
-  const handleFinancialUpdate = (updatedFinancials: any) => {
+  // 2. Use the strict type here
+  const handleFinancialUpdate = (updatedFinancials: FinancialSuccessPayload) => {
     setCurrentOrder((prev) => ({
       ...prev,
-      // We update the root total for consistency
       total_amount: updatedFinancials.order_amount, 
       financial_entry: {
-        // Handle case where financial_entry might have been null
         ...(prev.financial_entry || {
-            id: 0, // Placeholder ID until server refresh
+            id: 0,
             order_id: prev.id,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -91,8 +88,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
       .join(' ');
   };
 
-  // BUG FIX: Calculate which total to display. 
-  // If a financial entry exists, that is the "Final" agreed price, overriding the sum of items.
   const displayTotal = currentOrder.financial_entry?.order_amount ?? currentOrder.total_amount;
 
   return (
@@ -121,7 +116,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Studio Badge */}
           <div className="flex items-center gap-2 text-sm">
             <Camera className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Studio:</span>
@@ -130,7 +124,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
             </Badge>
           </div>
         
-          {/* Contact Info */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
@@ -148,7 +141,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
             )}
           </div>
 
-          {/* Ordered Items */}
           <div className="border-t pt-3 space-y-2">
             <h4 className="text-sm font-medium flex items-center gap-2">
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
@@ -172,7 +164,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
             </ul>
           </div>
 
-          {/* Total Amount - FIXED Display Logic */}
           <div className="border-t pt-3 flex justify-between items-center">
             <h4 className="text-base font-semibold flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
@@ -183,7 +174,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
             </span>
           </div>
           
-          {/* Financial Status */}
           {currentOrder.financial_entry && (
             <div className="flex items-center gap-2 text-sm">
               <DollarSign className="h-4 w-4 text-green-600" />
@@ -194,7 +184,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
             </div>
           )}
           
-          {/* Assigned Photographers */}
           {currentOrder.assigned_photographers && currentOrder.assigned_photographers.length > 0 && (
               <div className="text-sm">
                 <span className="text-muted-foreground">Assigned Staff:</span>
@@ -208,7 +197,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
               </div>
             )}
 
-          {/* Action Buttons */}
           {userRole === "management" && (
             <div className="flex flex-wrap gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
@@ -234,7 +222,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
         </CardContent>
       </Card>
       
-      {/* Dialogs */}
       {userRole === "management" && (
         <EditProductOrderDialog
           order={currentOrder}

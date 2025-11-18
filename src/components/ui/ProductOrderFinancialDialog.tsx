@@ -22,11 +22,22 @@ import {
   updateProductOrderPhotographerCommission 
 } from "@/lib/actions";
 
+// 1. Define and export the payload interface
+export interface FinancialSuccessPayload {
+  order_amount: number;
+  studio_fee: number;
+  other_expenses: number;
+  profit: number;
+  photographer_commission_total: number;
+  photographer_details: ProductOrderPhotographerCommission[];
+}
+
 interface ProductOrderFinancialDialogProps {
   order: ProductOrder;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: (data: any) => void;
+  // 2. Use the strict type here instead of 'any'
+  onSuccess?: (data: FinancialSuccessPayload) => void;
 }
 
 export function ProductOrderFinancialDialog({ 
@@ -40,7 +51,6 @@ export function ProductOrderFinancialDialog({
   const financialEntry = order.financial_entry;
   
   const [formData, setFormData] = useState({
-    // Logic: If financial entry exists, use that amount. If not, use order total.
     order_amount: financialEntry?.order_amount ?? order.total_amount ?? 0,
     studio_fee: financialEntry?.studio_fee || 0,
     other_expenses: financialEntry?.other_expenses || 0,
@@ -74,7 +84,6 @@ export function ProductOrderFinancialDialog({
       setPhotographerDetails(newDetails);
 
       setFormData({
-        // Logic: Reset to financial amount if exists, else original total
         order_amount: financialEntry?.order_amount ?? order.total_amount ?? 0,
         studio_fee: financialEntry?.studio_fee || 0,
         other_expenses: financialEntry?.other_expenses || 0,
@@ -138,7 +147,6 @@ export function ProductOrderFinancialDialog({
         description: "The order financial details have been successfully updated.",
       });
 
-      // 1. OPTIMISTIC UPDATE: Update parent immediately
       if (onSuccess) {
         onSuccess({
            ...mainData,
@@ -146,10 +154,7 @@ export function ProductOrderFinancialDialog({
         });
       }
 
-      // 2. Close Dialog
       onOpenChange(false);
-      
-      // 3. Server Sync (Background)
       router.refresh(); 
       
     } catch (error: unknown) {
@@ -186,7 +191,7 @@ export function ProductOrderFinancialDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            {/* Order Amount (Editable) */}
+            {/* Order Amount */}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="order_amount" className="text-right">
                 Order Amount
@@ -201,11 +206,10 @@ export function ProductOrderFinancialDialog({
               />
             </div>
 
-            {/* Expenses Breakdown Section */}
+            {/* Expenses Breakdown */}
             <div className="border-t pt-4">
               <h4 className="text-sm font-medium mb-3">Expenses Breakdown</h4>
               
-              {/* Photographer Commission Section */}
               <div className="space-y-3 mb-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium">Photographer Commission</Label>
@@ -244,7 +248,6 @@ export function ProductOrderFinancialDialog({
                 )}
               </div>
 
-              {/* Other Expenses */}
               <div className="space-y-3">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="studio_fee" className="text-right">
