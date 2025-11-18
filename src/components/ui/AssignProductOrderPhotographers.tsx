@@ -33,7 +33,8 @@ export function AssignProductOrderPhotographers({
 }: AssignProductOrderPhotographersProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState<string[]>(currentAssignments);
+  const [selectedStaff, setSelectedStaff] =
+    useState<string[]>(currentAssignments);
 
   // Only management can assign photographers
   if (userRole !== "management") {
@@ -41,19 +42,22 @@ export function AssignProductOrderPhotographers({
   }
 
   const handleStaffToggle = (staffName: string) => {
-    setSelectedStaff(prev =>
+    setSelectedStaff((prev) =>
       prev.includes(staffName)
-        ? prev.filter(name => name !== staffName)
+        ? prev.filter((name) => name !== staffName)
         : [...prev, staffName]
     );
   };
 
   const handleAssign = async () => {
     setIsAssigning(true);
-    
+
     try {
-      const result = await updateProductOrderAssignments(orderId, selectedStaff);
-      
+      const result = await updateProductOrderAssignments(
+        orderId,
+        selectedStaff
+      );
+
       if (result.error) {
         toast.error("Assignment Failed", {
           description: result.error,
@@ -81,14 +85,14 @@ export function AssignProductOrderPhotographers({
           Assign Staff
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Assign Staff to Product Order</DialogTitle>
           <DialogDescription>
             Select team members to assign to this product order.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4 py-4">
           <div className="space-y-3">
             {availableStaff.map((staff) => (
@@ -106,7 +110,7 @@ export function AssignProductOrderPhotographers({
                 </Label>
               </div>
             ))}
-            
+
             {availableStaff.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">
                 No staff members available for assignment.
@@ -115,17 +119,19 @@ export function AssignProductOrderPhotographers({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
           <Button
             variant="outline"
             onClick={() => setIsOpen(false)}
             disabled={isAssigning}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             onClick={handleAssign}
             disabled={isAssigning || availableStaff.length === 0}
+            className="w-full sm:w-auto"
           >
             {isAssigning ? "Assigning..." : "Assign Staff"}
           </Button>

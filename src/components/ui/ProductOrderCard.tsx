@@ -1,7 +1,7 @@
 // components/ui/ProductOrderCard.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ProductOrder } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,6 @@ interface ProductOrderCardProps {
   availableStaff: { id: string; full_name: string }[];
 }
 
-// Define proper types for ordered items
 interface OrderedItem {
   size: string;
   type: string;
@@ -31,12 +30,10 @@ interface OrderedItem {
   line_total: number;
 }
 
-// Helper to format currency
 const formatCurrency = (amount: number) => {
   return `Rs. ${amount.toLocaleString('en-LK')}`;
 };
 
-// Helper to format item details with proper typing
 const formatItemDetails = (item: OrderedItem) => {
   let details = `${item.size}`;
   if (item.type === 'frame' && item.material) details += `, ${item.material}`;
@@ -48,6 +45,34 @@ const formatItemDetails = (item: OrderedItem) => {
 export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrderCardProps) {
   const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  
+  // Local state for optimistic updates
+  const [currentOrder, setCurrentOrder] = useState<ProductOrder>(order);
+
+  // Sync with server data when router.refresh() completes
+  useEffect(() => {
+    setCurrentOrder(order);
+  }, [order]);
+
+  // Handler to update local state immediately
+  const handleFinancialUpdate = (updatedFinancials: any) => {
+    setCurrentOrder((prev) => ({
+      ...prev,
+      // We update the root total for consistency
+      total_amount: updatedFinancials.order_amount, 
+      financial_entry: {
+        // Handle case where financial_entry might have been null
+        ...(prev.financial_entry || {
+            id: 0, // Placeholder ID until server refresh
+            order_id: prev.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            photographer_details: []
+        }), 
+        ...updatedFinancials,
+      },
+    }));
+  };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not specified";
@@ -58,7 +83,6 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
     });
   };
 
-  // Format studio slug to readable name
   const formatStudioName = (studioSlug: string) => {
     if (!studioSlug) return "Unknown Studio";
     return studioSlug
@@ -66,6 +90,10 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   };
+
+  // BUG FIX: Calculate which total to display. 
+  // If a financial entry exists, that is the "Final" agreed price, overriding the sum of items.
+  const displayTotal = currentOrder.financial_entry?.order_amount ?? currentOrder.total_amount;
 
   return (
     <>
@@ -75,18 +103,18 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
                 <User className="h-4 w-4" />
-                {order.customer_name}
+                {currentOrder.customer_name}
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Order ID: {order.order_id}
+                Order ID: {currentOrder.order_id}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Date: {formatDate(order.created_at)}
+                Date: {formatDate(currentOrder.created_at)}
               </p>
             </div>
             <UpdateProductOrderStatus
-              orderId={order.id}
-              currentStatus={order.status || "Pending"}
+              orderId={currentOrder.id}
+              currentStatus={currentOrder.status || "Pending"}
               userRole={userRole}
             />
           </div>
@@ -98,7 +126,7 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
             <Camera className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Studio:</span>
             <Badge variant="secondary" className="text-xs">
-              {formatStudioName(order.studio_slug)}
+              {formatStudioName(currentOrder.studio_slug)}
             </Badge>
           </div>
         
@@ -106,21 +134,15 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
-              <a
-                href={`mailto:${order.customer_email}`}
-                className="text-blue-600 hover:underline"
-              >
-                {order.customer_email}
+              <a href={`mailto:${currentOrder.customer_email}`} className="text-blue-600 hover:underline">
+                {currentOrder.customer_email}
               </a>
             </div>
-            {order.customer_mobile && (
+            {currentOrder.customer_mobile && (
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                <a
-                  href={`tel:${order.customer_mobile}`}
-                  className="text-blue-600 hover:underline"
-                >
-                  {order.customer_mobile}
+                <a href={`tel:${currentOrder.customer_mobile}`} className="text-blue-600 hover:underline">
+                  {currentOrder.customer_mobile}
                 </a>
               </div>
             )}
@@ -133,7 +155,7 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
               Ordered Items
             </h4>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              {order.ordered_items?.map((item, index) => (
+              {currentOrder.ordered_items?.map((item, index) => (
                 <li key={index} className="flex justify-between items-start">
                   <div className="flex-1 pr-2">
                     <span className="font-medium text-foreground">
@@ -150,19 +172,19 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
             </ul>
           </div>
 
-          {/* Total Amount */}
+          {/* Total Amount - FIXED Display Logic */}
           <div className="border-t pt-3 flex justify-between items-center">
             <h4 className="text-base font-semibold flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
               Total Amount
             </h4>
             <span className="text-lg font-bold">
-              {formatCurrency(order.total_amount)}
+              {formatCurrency(displayTotal)}
             </span>
           </div>
           
           {/* Financial Status */}
-          {order.financial_entry && (
+          {currentOrder.financial_entry && (
             <div className="flex items-center gap-2 text-sm">
               <DollarSign className="h-4 w-4 text-green-600" />
               <span className="text-muted-foreground">Financials:</span>
@@ -173,12 +195,11 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
           )}
           
           {/* Assigned Photographers */}
-          {order.assigned_photographers &&
-            order.assigned_photographers.length > 0 && (
+          {currentOrder.assigned_photographers && currentOrder.assigned_photographers.length > 0 && (
               <div className="text-sm">
                 <span className="text-muted-foreground">Assigned Staff:</span>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {order.assigned_photographers.map((photographer, index) => (
+                  {currentOrder.assigned_photographers.map((photographer, index) => (
                     <Badge key={index} variant="outline" className="text-xs">
                       {photographer}
                     </Badge>
@@ -190,30 +211,22 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
           {/* Action Buttons */}
           {userRole === "management" && (
             <div className="flex flex-wrap gap-2 pt-2 border-t">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditDialogOpen(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
                 <Edit className="h-3 w-3 mr-1" />
                 Edit
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsFinancialDialogOpen(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setIsFinancialDialogOpen(true)}>
                 <DollarSign className="h-3 w-3 mr-1" />
                 Financial
               </Button>
               <AssignProductOrderPhotographers
-                orderId={order.id}
-                currentAssignments={order.assigned_photographers || []}
+                orderId={currentOrder.id}
+                currentAssignments={currentOrder.assigned_photographers || []}
                 availableStaff={availableStaff}
                 userRole={userRole}
               />
               <DeleteProductOrderButton
-                orderId={order.id}
+                orderId={currentOrder.id}
                 userRole={userRole}
               />
             </div>
@@ -221,21 +234,21 @@ export function ProductOrderCard({ order, userRole, availableStaff }: ProductOrd
         </CardContent>
       </Card>
       
-      {/* Edit Dialog */}
+      {/* Dialogs */}
       {userRole === "management" && (
         <EditProductOrderDialog
-          order={order}
+          order={currentOrder}
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
         />
       )}
 
-      {/* Financial Dialog */}
       {userRole === "management" && (
         <ProductOrderFinancialDialog
-          order={order}
+          order={currentOrder}
           open={isFinancialDialogOpen}
           onOpenChange={setIsFinancialDialogOpen}
+          onSuccess={handleFinancialUpdate}
         />
       )}
     </>

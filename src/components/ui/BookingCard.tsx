@@ -1,4 +1,4 @@
-// components/ui/BookingCard.tsx - Full updated file
+// components/ui/BookingCard.tsx - Mobile Responsive Update
 "use client";
 
 import { useState } from "react";
@@ -33,186 +33,154 @@ export function BookingCard({ booking, userRole, availableStaff, packages }: Boo
     });
   };
 
-  // Format studio slug to readable name
   const formatStudioName = (studioSlug: string) => {
-    return studioSlug
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+    return studioSlug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
   return (
     <>
-      <Card className="hover:shadow-lg transition-shadow duration-200">
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="h-4 w-4" />
-                {booking.full_name}
+      <Card className="hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
+        <CardHeader className="pb-3 px-4 pt-4 md:px-6 md:pt-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+            <div className="min-w-0"> {/* min-w-0 helps text truncate properly */}
+              <CardTitle className="text-base md:text-lg flex items-center gap-2 truncate">
+                <User className="h-4 w-4 shrink-0" />
+                <span className="truncate">{booking.full_name}</span>
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1 break-all">
                 {booking.inquiry_id}
               </p>
             </div>
-            <UpdateBookingStatus
-              bookingId={booking.id}
-              currentStatus={booking.status || "New"}
-              userRole={userRole}
-            />
+            <div className="self-end sm:self-auto">
+                <UpdateBookingStatus
+                  bookingId={booking.id}
+                  currentStatus={booking.status || "New"}
+                  userRole={userRole}
+                />
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3">
-          {/* Studio Badge */}
-          <div className="flex items-center gap-2 text-sm">
-            <Camera className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Studio:</span>
-            <Badge variant="secondary" className="text-xs">
-              {formatStudioName(booking.studio_slug)}
-            </Badge>
+        <CardContent className="space-y-3 px-4 pb-4 md:px-6 md:pb-6 flex-1">
+          {/* Info Grid - Compact on mobile */}
+          <div className="grid gap-2 text-sm">
+             <div className="flex items-center gap-2">
+                <Camera className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground hidden xs:inline">Studio:</span>
+                <Badge variant="secondary" className="text-[10px] xs:text-xs truncate max-w-[150px]">
+                  {formatStudioName(booking.studio_slug)}
+                </Badge>
+              </div>
+
+             <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <a href={`mailto:${booking.email}`} className="text-blue-600 hover:underline truncate block w-full">
+                  {booking.email}
+                </a>
+              </div>
+
+             {booking.mobile_number && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <a href={`tel:${booking.mobile_number}`} className="text-blue-600 hover:underline">
+                    {booking.mobile_number}
+                  </a>
+                </div>
+              )}
+
+             <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span>{formatDate(booking.event_date)}</span>
+              </div>
+
+             {booking.event_type && (
+                <div className="flex items-center gap-2">
+                  <Building className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="truncate">{booking.event_type}</span>
+                </div>
+              )}
+
+             {booking.package_name && (
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="truncate">{booking.package_name}</span>
+                </div>
+              )}
           </div>
-
-          {/* Email */}
-          <div className="flex items-center gap-2 text-sm">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Email:</span>
-            <a
-              href={`mailto:${booking.email}`}
-              className="text-blue-600 hover:underline"
-            >
-              {booking.email}
-            </a>
-          </div>
-
-          {/* Mobile Number */}
-          {booking.mobile_number && (
-            <div className="flex items-center gap-2 text-sm">
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Mobile:</span>
-              <a
-                href={`tel:${booking.mobile_number}`}
-                className="text-blue-600 hover:underline"
-              >
-                {booking.mobile_number}
-              </a>
-            </div>
-          )}
-
-          {/* Event Date */}
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Event Date:</span>
-            <span>{formatDate(booking.event_date)}</span>
-          </div>
-
-          {/* Event Type */}
-          {booking.event_type && (
-            <div className="flex items-center gap-2 text-sm">
-              <Building className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Event Type:</span>
-              <span>{booking.event_type}</span>
-            </div>
-          )}
-
-          {/* Package */}
-          {booking.package_name && (
-            <div className="flex items-center gap-2 text-sm">
-              <Package className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Package:</span>
-              <span>{booking.package_name}</span>
-            </div>
-          )}
 
           {/* Financial Status */}
           {booking.financial_entry && (
-            <div className="flex items-center gap-2 text-sm">
-              <DollarSign className="h-4 w-4 text-green-600" />
-              <span className="text-muted-foreground">Financial:</span>
-              <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
-                Completed
+            <div className="flex items-center gap-2 text-sm pt-1">
+              <DollarSign className="h-4 w-4 text-green-600 shrink-0" />
+              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                Financials Completed
               </Badge>
             </div>
           )}
 
           {/* Assigned Photographers */}
-          {booking.assigned_photographers &&
-            booking.assigned_photographers.length > 0 && (
-              <div className="text-sm">
-                <span className="text-muted-foreground">Assigned Staff:</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {booking.assigned_photographers.map((photographer, index) => (
-                    <Badge key={index} variant="outline" className="text-xs">
-                      {photographer}
-                    </Badge>
-                  ))}
-                </div>
+          {booking.assigned_photographers && booking.assigned_photographers.length > 0 && (
+            <div className="text-sm pt-1">
+              <span className="text-muted-foreground block mb-1">Assigned Staff:</span>
+              <div className="flex flex-wrap gap-1">
+                {booking.assigned_photographers.map((photographer, index) => (
+                  <Badge key={index} variant="outline" className="text-[10px]">
+                    {photographer}
+                  </Badge>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-          {/* Message Preview */}
+           {/* Message Preview */}
           {booking.message && (
-            <div className="text-sm">
-              <span className="text-muted-foreground">Message:</span>
-              <p className="mt-1 line-clamp-2 text-muted-foreground">
-                {booking.message}
+            <div className="text-sm pt-1">
+              <p className="line-clamp-2 text-muted-foreground text-xs italic border-l-2 pl-2 border-muted">
+                "{booking.message}"
               </p>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2 pt-2">
+          {/* Action Buttons - Wrap nicely */}
+          <div className="flex flex-wrap gap-2 pt-3 mt-auto">
             {userRole === "management" && (
               <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditDialogOpen(true)}
-                >
-                  <Edit className="h-3 w-3 mr-1" />
-                  Edit
+                <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => setIsEditDialogOpen(true)}>
+                  <Edit className="h-3 w-3 mr-1" /> Edit
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsFinancialDialogOpen(true)}
-                >
-                  <DollarSign className="h-3 w-3 mr-1" />
-                  Financial
+                <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => setIsFinancialDialogOpen(true)}>
+                  <DollarSign className="h-3 w-3 mr-1" /> Financial
                 </Button>
-                <AssignPhotographers
-                  bookingId={booking.id}
-                  currentAssignments={booking.assigned_photographers || []}
-                  availableStaff={availableStaff}
-                  userRole={userRole}
-                />
-                <DeleteBookingButton
-                  bookingId={booking.id}
-                  userRole={userRole}
-                />
+                <div className="flex gap-2">
+                    <AssignPhotographers
+                      bookingId={booking.id}
+                      currentAssignments={booking.assigned_photographers || []}
+                      availableStaff={availableStaff}
+                      userRole={userRole}
+                    />
+                    <DeleteBookingButton bookingId={booking.id} userRole={userRole} />
+                </div>
               </>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
+      {/* Dialogs */}
       {userRole === "management" && (
-        <EditBookingDialog
-          booking={booking}
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-        />
-      )}
-
-      {/* Financial Dialog */}
-      {userRole === "management" && (
-        <FinancialDialog
-          booking={booking}
-          open={isFinancialDialogOpen}
-          onOpenChange={setIsFinancialDialogOpen}
-          packages={packages}
-        />
+        <>
+            <EditBookingDialog
+              booking={booking}
+              open={isEditDialogOpen}
+              onOpenChange={setIsEditDialogOpen}
+            />
+            <FinancialDialog
+              booking={booking}
+              open={isFinancialDialogOpen}
+              onOpenChange={setIsFinancialDialogOpen}
+              packages={packages}
+            />
+        </>
       )}
     </>
   );

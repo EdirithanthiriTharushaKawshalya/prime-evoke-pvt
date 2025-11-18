@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { ProductOrder, ProductOrderPhotographerCommission } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,14 +26,22 @@ interface ProductOrderFinancialDialogProps {
   order: ProductOrder;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: (data: any) => void;
 }
 
-export function ProductOrderFinancialDialog({ order, open, onOpenChange }: ProductOrderFinancialDialogProps) {
+export function ProductOrderFinancialDialog({ 
+  order, 
+  open, 
+  onOpenChange,
+  onSuccess 
+}: ProductOrderFinancialDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
   const financialEntry = order.financial_entry;
   
   const [formData, setFormData] = useState({
-    order_amount: financialEntry?.order_amount || order.total_amount || 0,
+    // Logic: If financial entry exists, use that amount. If not, use order total.
+    order_amount: financialEntry?.order_amount ?? order.total_amount ?? 0,
     studio_fee: financialEntry?.studio_fee || 0,
     other_expenses: financialEntry?.other_expenses || 0,
     profit: financialEntry?.profit || 0,
@@ -40,13 +49,9 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
 
   const [photographerDetails, setPhotographerDetails] = useState<ProductOrderPhotographerCommission[]>([]);
 
-  // Extract assigned photographers to a variable for stable reference
   const assignedPhotographers = order.assigned_photographers || [];
-  
-  // Memoize assigned staff
   const assignedStaff = useMemo(() => assignedPhotographers, [assignedPhotographers]);
 
-  // Initialize photographer details when dialog opens or staff changes
   useEffect(() => {
     if (open) {
       const existingDetails = financialEntry?.photographer_details || [];
@@ -58,7 +63,7 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
           newDetails.push(existing);
         } else {
           newDetails.push({
-            id: 0, // Temp ID
+            id: 0, 
             order_id: order.id,
             staff_name: staffName,
             amount: 0,
@@ -68,9 +73,9 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
       });
       setPhotographerDetails(newDetails);
 
-      // Set form data from existing entry or order total
       setFormData({
-        order_amount: financialEntry?.order_amount || order.total_amount || 0,
+        // Logic: Reset to financial amount if exists, else original total
+        order_amount: financialEntry?.order_amount ?? order.total_amount ?? 0,
         studio_fee: financialEntry?.studio_fee || 0,
         other_expenses: financialEntry?.other_expenses || 0,
         profit: financialEntry?.profit || 0,
@@ -78,14 +83,11 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
     }
   }, [open, assignedStaff, financialEntry, order.id, order.total_amount]);
 
-
-  // Calculate total photographer commission from individual amounts
   const photographer_commission_total = useMemo(() => 
     photographerDetails.reduce((sum, detail) => sum + (detail.amount || 0), 0),
     [photographerDetails]
   );
 
-  // Calculate total expenses and balance
   const totalExpenses = useMemo(() => 
     (photographer_commission_total || 0) +
     (formData.studio_fee || 0) +
@@ -98,7 +100,6 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
   const isBalanced = totalExpenses === orderAmount;
   const balanceDifference = orderAmount - totalExpenses;
 
-  // Handle individual photographer amount changes
   const handlePhotographerAmountChange = useCallback((staffName: string, amount: number) => {
     setPhotographerDetails(prev => 
       prev.map(detail => 
@@ -122,24 +123,34 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
     setIsLoading(true);
 
     try {
-      // 1. Update the main financial entry
       const mainData = {
         ...formData,
         photographer_commission_total,
       };
-      const result = await updateProductOrderFinancialEntry(order.id, mainData);
       
+      const result = await updateProductOrderFinancialEntry(order.id, mainData);
       if (result.error) throw new Error(result.error);
 
-      // 2. Update photographer commission details
       const photographerResult = await updateProductOrderPhotographerCommission(order.id, photographerDetails);
-      
       if (photographerResult.error) throw new Error(photographerResult.error);
 
       toast.success("Financial Data Saved", {
         description: "The order financial details have been successfully updated.",
       });
+
+      // 1. OPTIMISTIC UPDATE: Update parent immediately
+      if (onSuccess) {
+        onSuccess({
+           ...mainData,
+           photographer_details: photographerDetails
+        });
+      }
+
+      // 2. Close Dialog
       onOpenChange(false);
+      
+      // 3. Server Sync (Background)
+      router.refresh(); 
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
@@ -175,7 +186,7 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            {/* Order Amount (Read-only) */}
+            {/* Order Amount (Editable) */}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="order_amount" className="text-right">
                 Order Amount
@@ -185,8 +196,8 @@ export function ProductOrderFinancialDialog({ order, open, onOpenChange }: Produ
                 name="order_amount"
                 type="number"
                 value={formData.order_amount}
-                readOnly
-                className="col-span-3 bg-muted/50 border-dashed"
+                onChange={handleChange} 
+                className="col-span-3" 
               />
             </div>
 

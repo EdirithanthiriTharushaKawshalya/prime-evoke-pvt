@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import Link from "next/link"; // Import Link for the logo
+import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -26,18 +26,45 @@ export default function LoginPage() {
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
 
-    setLoading(false);
-    if (error) {
-      toast.error("Login Failed!", { description: error.message });
-    } else {
-      toast.success("Login Successful!");
-      router.replace("/admin/bookings"); 
-      router.refresh();
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setLoading(false); // Stop loading to allow retry
+        
+        // Provide specific feedback for incorrect passwords vs other errors
+        let errorMessage = error.message;
+        if (error.message.includes("Invalid login credentials")) {
+          errorMessage = "Incorrect email or password. Please try again.";
+        }
+
+        toast.error("Login Failed", { 
+          description: errorMessage 
+        });
+        return;
+      }
+
+      // Login Successful
+      toast.success("Login Successful", {
+        description: "Redirecting to dashboard...",
+      });
+
+      // Keep loading state true (button says "Logging in...") while redirecting
+      // Add a small delay to ensure the user sees the success toast
+      setTimeout(() => {
+        router.replace("/admin/bookings");
+        router.refresh();
+      }, 1000);
+
+    } catch (err) {
+      setLoading(false);
+      toast.error("System Error", { 
+        description: "An unexpected error occurred. Please try again." 
+      });
     }
   };
 
@@ -46,14 +73,11 @@ export default function LoginPage() {
     <div className="relative flex items-center justify-center min-h-screen p-4">
       <AnimatedBackground />
       {/* --- Updated Card Styling --- */}
-      <Card className="w-full max-w-md bg-background/80 backdrop-blur-sm border border-white/10 rounded-xl shadow-lg"
-      data-aos="fade-up"
+      <Card 
+        className="w-full max-w-md bg-background/80 backdrop-blur-sm border border-white/10 rounded-xl shadow-lg"
+        data-aos="fade-up"
       >
-        {" "}
-        {/* Added transparency, blur, border, rounded-xl */}
         <CardHeader className="text-center pt-8 pb-4">
-          {" "}
-          {/* Adjusted padding */}
           {/* 1. Added Logo Link */}
           <Link
             href="/"
@@ -62,23 +86,17 @@ export default function LoginPage() {
             Prime Evoke{" "}
             <span className="text-muted-foreground">Private Limited </span>
           </Link>
-          <CardTitle className="text-2xl text-white">Admin Login</CardTitle>{" "}
-          {/* Adjusted title */}
+          <CardTitle className="text-2xl text-white">Admin Login</CardTitle>
           <CardDescription className="text-muted-foreground/80">
-            {" "}
-            {/* Adjusted description color */}
             Enter your credentials to access the dashboard.
           </CardDescription>
         </CardHeader>
         <CardContent className="pb-8 px-6">
-          {" "}
-          {/* Adjusted padding */}
           <form onSubmit={handleLogin} className="grid gap-4">
             <div className="grid gap-2 pl-5 pr-5">
               <Label htmlFor="email" className="text-muted-foreground">
                 Email
-              </Label>{" "}
-              {/* Adjusted label color */}
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -87,14 +105,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
-                className="bg-background/70 border-white/20 focus:border-white/50 " // Input styling
+                className="bg-background/70 border-white/20 focus:border-white/50"
               />
             </div>
             <div className="grid gap-2 pl-5 pr-5">
               <Label htmlFor="password" className="text-muted-foreground">
                 Password
-              </Label>{" "}
-              {/* Adjusted label color */}
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -102,15 +119,12 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                className="bg-background/70 border-white/20 focus:border-white/50" // Input styling
+                className="bg-background/70 border-white/20 focus:border-white/50"
               />
-              {/* Optional: Add "Forgot Password?" link here */}
             </div>
             
             <div className="flex justify-center pt-2">
               <Button type="submit" disabled={loading} className="px-15">
-                {" "}
-                {/* Example: Added px-12 */}
                 {loading ? "Logging in..." : "Login"}
               </Button>
             </div>
