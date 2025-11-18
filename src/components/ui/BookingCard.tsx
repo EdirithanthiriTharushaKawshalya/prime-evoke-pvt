@@ -136,7 +136,7 @@ export function BookingCard({ booking, userRole, availableStaff, packages }: Boo
           {booking.message && (
             <div className="text-sm pt-1">
               <p className="line-clamp-2 text-muted-foreground text-xs italic border-l-2 pl-2 border-muted">
-                "{booking.message}"
+                &quot;{booking.message}&quot;
               </p>
             </div>
           )}
