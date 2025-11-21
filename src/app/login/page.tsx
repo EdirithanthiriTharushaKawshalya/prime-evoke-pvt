@@ -34,29 +34,22 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setLoading(false); // Stop loading to allow retry
-        
-        // Provide specific feedback for incorrect passwords vs other errors
+        setLoading(false);
         let errorMessage = error.message;
         if (error.message.includes("Invalid login credentials")) {
           errorMessage = "Incorrect email or password. Please try again.";
         }
-
-        toast.error("Login Failed", { 
-          description: errorMessage 
-        });
+        toast.error("Login Failed", { description: errorMessage });
         return;
       }
 
-      // Login Successful
       toast.success("Login Successful", {
         description: "Redirecting to dashboard...",
       });
 
-      // Keep loading state true (button says "Logging in...") while redirecting
-      // Add a small delay to ensure the user sees the success toast
       setTimeout(() => {
-        router.replace("/admin");
+        // ENSURE THIS POINTS TO /admin (The Hub)
+        router.replace("/admin"); 
         router.refresh();
       }, 1000);
 
@@ -69,16 +62,13 @@ export default function LoginPage() {
   };
 
   return (
-    // Ensure container takes full height and centers content
     <div className="relative flex items-center justify-center min-h-screen p-4">
       <AnimatedBackground />
-      {/* --- Updated Card Styling --- */}
       <Card 
         className="w-full max-w-md bg-background/80 backdrop-blur-sm border border-white/10 rounded-xl shadow-lg"
         data-aos="fade-up"
       >
         <CardHeader className="text-center pt-8 pb-4">
-          {/* 1. Added Logo Link */}
           <Link
             href="/"
             className="mb-4 inline-block text-xl font-bold tracking-tight text-white"

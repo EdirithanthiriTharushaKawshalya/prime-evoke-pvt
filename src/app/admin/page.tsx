@@ -8,9 +8,9 @@ import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CalendarDays, DollarSign, Package, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { LogoutButton } from "@/components/ui/LogoutButton"; // ADDED
 
 export default async function AdminHub() {
-  // FIX: await cookies()
   const cookieStore = await cookies();
   
   const supabase = createServerClient(
@@ -55,35 +55,43 @@ export default async function AdminHub() {
     <div className="relative min-h-screen flex flex-col">
       <AnimatedBackground />
       <Header />
-      <div className="container mx-auto py-12 px-4 flex-1 flex flex-col justify-center">
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Admin Overview</h1>
-          <p className="text-muted-foreground text-lg">Select a module to manage</p>
+      <div className="container mx-auto py-8 px-4 flex-1 flex flex-col">
+        
+        {/* ADDED: Logout Button Container */}
+        <div className="flex justify-end mb-4">
+          <LogoutButton />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto w-full">
-          {menuItems.map((item) => (
-            <Link key={item.title} href={item.href} className="group">
-              <Card className="h-full border-white/10 bg-card/50 backdrop-blur-sm hover:bg-card/80 transition-all duration-300 hover:border-white/20 hover:scale-[1.02]">
-                <CardHeader>
-                  <div className={`w-12 h-12 rounded-lg ${item.bgColor} flex items-center justify-center mb-4`}>
-                    <item.icon className={`h-6 w-6 ${item.color}`} />
-                  </div>
-                  <CardTitle className="text-xl group-hover:text-primary transition-colors">
-                    {item.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-base mb-6">
-                    {item.description}
-                  </CardDescription>
-                  <div className="flex items-center text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                    Access Module <ArrowRight className="ml-2 h-4 w-4" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+        <div className="flex-1 flex flex-col justify-center">
+          <div className="mb-10 text-center">
+            <h1 className="text-4xl font-bold tracking-tight mb-2">Admin Overview</h1>
+            <p className="text-muted-foreground text-lg">Select a module to manage</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto w-full mb-12">
+            {menuItems.map((item) => (
+              <Link key={item.title} href={item.href} className="group">
+                <Card className="h-full border-white/10 bg-card/50 backdrop-blur-sm hover:bg-card/80 transition-all duration-300 hover:border-white/20 hover:scale-[1.02]">
+                  <CardHeader>
+                    <div className={`w-12 h-12 rounded-lg ${item.bgColor} flex items-center justify-center mb-4`}>
+                      <item.icon className={`h-6 w-6 ${item.color}`} />
+                    </div>
+                    <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                      {item.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-base mb-6">
+                      {item.description}
+                    </CardDescription>
+                    <div className="flex items-center text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                      Access Module <ArrowRight className="ml-2 h-4 w-4" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
       <Footer />

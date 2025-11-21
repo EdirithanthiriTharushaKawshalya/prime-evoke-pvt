@@ -1,4 +1,4 @@
-// app/admin/bookings/page.tsx - Mobile Responsive Update
+// app/admin/bookings/page.tsx
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -12,14 +12,17 @@ import {
   ServicePackage,
   ProductOrder,
 } from "@/lib/types";
-import { LogoutButton } from "@/components/ui/LogoutButton";
+// REMOVED: LogoutButton
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductOrderCard } from "@/components/ui/ProductOrderCard";
+// ADDED: Imports for Back Button
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
-// ... (keep helper functions: groupBookingsByMonth, groupProductOrdersByMonth) ...
 const groupBookingsByMonth = (bookings: Booking[]) => {
   return bookings.reduce((acc, booking) => {
     const groupDate = booking.event_date
@@ -48,9 +51,7 @@ const groupProductOrdersByMonth = (orders: ProductOrder[]) => {
   }, {} as Record<string, ProductOrder[]>);
 };
 
-// Main Async Server Component
 export default async function AdminBookingsPage() {
-  // ... (keep all data fetching logic: cookieStore, supabase, session, profile, packages, bookings, productOrders, availableStaff) ...
   const cookieStore = cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -168,10 +169,10 @@ export default async function AdminBookingsPage() {
   const availableStaff = assignableMembers.filter((m) => m.name).map((m) => ({ id: String(m.id), full_name: m.name }));
 
   const groupedBookings = groupBookingsByMonth(bookings);
-  const now = new Date();
   const sortedBookingMonths = Object.keys(groupedBookings).sort((a, b) => {
     const dateA = new Date(a);
     const dateB = new Date(b);
+    const now = new Date();
     const isAFuture = dateA.getFullYear() > now.getFullYear() || (dateA.getFullYear() === now.getFullYear() && dateA.getMonth() >= now.getMonth());
     const isBFuture = dateB.getFullYear() > now.getFullYear() || (dateB.getFullYear() === now.getFullYear() && dateB.getMonth() >= now.getMonth());
     if (isAFuture && !isBFuture) return -1;
@@ -191,19 +192,27 @@ export default async function AdminBookingsPage() {
         <Header />
         <div className="container mx-auto py-6 px-4 md:py-10">
           
-          {/* --- Header Section (Stack on mobile, Row on desktop) --- */}
+          {/* --- Header Section --- */}
           <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Admin Dashboard</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Manage client bookings and product orders
-              </p>
+            <div className="flex items-center gap-3">
+              {/* ADDED: Back Button */}
+              <Link href="/admin">
+                <Button variant="ghost" size="icon" className="shrink-0">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold">Bookings & Orders</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Manage client bookings and product orders
+                </p>
+              </div>
             </div>
-            {/* Action Buttons (Wrap on mobile) */}
+            
+            {/* Action Buttons - REMOVED Logout */}
             <div className="flex flex-wrap items-center gap-2 md:gap-4">
               <ReportDownloadButton userRole={userRole} />
               <MySalaryDownloadButton />
-              <LogoutButton />
             </div>
           </div>
 
@@ -246,7 +255,6 @@ export default async function AdminBookingsPage() {
                     </span>
                   </h2>
                   
-                  {/* Responsive Grid: 1 col on mobile, 2 on tablet, 3 on desktop */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {groupedBookings[monthYear].map((booking) => (
                       <BookingCard
@@ -282,7 +290,6 @@ export default async function AdminBookingsPage() {
                     </span>
                   </h2>
                   
-                   {/* Responsive Grid: 1 col on mobile, 2 on tablet, 3 on desktop */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {groupedProductOrders[monthYear].map((order) => (
                       <ProductOrderCard

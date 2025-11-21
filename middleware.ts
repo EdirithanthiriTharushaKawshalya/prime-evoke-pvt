@@ -64,7 +64,8 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // Define protected routes
-  const protectedPaths = ['/admin', '/admin/bookings']; // Add other admin paths if needed
+  // "startsWith('/admin')" will automatically cover /admin, /admin/bookings, /admin/stock, etc.
+  const protectedPaths = ['/admin']; 
   const currentPath = request.nextUrl.pathname;
 
   // If trying to access a protected route and NOT logged in, redirect to login
@@ -72,9 +73,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // If logged IN and trying to access the login page, redirect to admin
+  // If logged IN and trying to access the login page, redirect to the NEW ADMIN HUB
   if (user && currentPath === '/login') {
-     return NextResponse.redirect(new URL('/admin/bookings', request.url));
+     // CHANGE: Redirect to '/admin' instead of '/admin/bookings'
+     return NextResponse.redirect(new URL('/admin', request.url));
   }
 
   // Allow the request to continue
