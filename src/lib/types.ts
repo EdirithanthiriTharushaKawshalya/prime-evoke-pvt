@@ -196,3 +196,27 @@ export type ProductOrder = {
   assigned_photographers: string[] | null; // <-- ADDED
   financial_entry?: ProductOrderFinancialEntry | null; // <-- ADDED
 };
+
+// --- NEW Financial Record Type ---
+export type FinancialRecord = {
+  id: number;
+  created_at: string;
+  date: string;
+  description: string;
+  type: 'Income' | 'Expense';
+  category: string;
+  amount: number;
+  payment_method: string | null;
+};
+
+// --- NEW Stock Item Type ---
+export type StockItem = {
+  id: number;
+  created_at: string;
+  item_name: string;
+  category: string; // 'Frame', 'Paper', 'Other'
+  quantity: number;
+  unit_price: number;
+  reorder_level: number;
+  last_updated: string;
+};

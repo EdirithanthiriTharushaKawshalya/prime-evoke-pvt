@@ -9,7 +9,9 @@ import {
   PhotographerFinancialDetail, 
   OrderedItem, 
   ProductOrder,
-  ProductOrderPhotographerCommission
+  ProductOrderPhotographerCommission,
+  FinancialRecord, 
+  StockItem 
 } from '@/lib/types';
 
 // --- generateMonthlyReport function ---
@@ -1404,4 +1406,231 @@ export async function generateMySalaryReport(month: string, year: string) {
     const message = error instanceof Error ? error.message : "An unexpected error occurred";
     return { error: `Failed to generate report: ${message}` };
   }
+}
+
+// --- FINANCIAL RECORDS ACTIONS ---
+
+export async function addFinancialRecord(data: Omit<FinancialRecord, 'id' | 'created_at'>) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can add financial records." };
+  }
+
+  const { error } = await supabase.from('other_financial_records').insert([data]);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/financials');
+  return { success: true };
+}
+
+export async function deleteFinancialRecord(id: number) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can delete financial records." };
+  }
+
+  const { error } = await supabase.from('other_financial_records').delete().eq('id', id);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/financials');
+  return { success: true };
+}
+
+// --- STOCK ACTIONS ---
+
+export async function addStockItem(data: Omit<StockItem, 'id' | 'created_at' | 'last_updated'>) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can add stock items." };
+  }
+
+  const { error } = await supabase.from('inventory_stock').insert([data]);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/stock');
+  return { success: true };
+}
+
+export async function updateStockQuantity(id: number, newQuantity: number) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can update stock." };
+  }
+
+  const { error } = await supabase
+    .from('inventory_stock')
+    .update({ quantity: newQuantity, last_updated: new Date().toISOString() })
+    .eq('id', id);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/stock');
+  return { success: true };
+}
+
+export async function deleteStockItem(id: number) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  // Security Check: Ensure user is authenticated and management
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error fetching session:", sessionError);
+    return { error: sessionError.message };
+  }
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return { error: profileError.message };
+  }
+
+  if (profile?.role !== 'management') {
+    return { error: "Permission denied. Only management can delete stock items." };
+  }
+
+  const { error } = await supabase.from('inventory_stock').delete().eq('id', id);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/stock');
+  return { success: true };
 }

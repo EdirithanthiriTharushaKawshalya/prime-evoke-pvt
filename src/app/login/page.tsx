@@ -56,7 +56,7 @@ export default function LoginPage() {
       // Keep loading state true (button says "Logging in...") while redirecting
       // Add a small delay to ensure the user sees the success toast
       setTimeout(() => {
-        router.replace("/admin/bookings");
+        router.replace("/admin");
         router.refresh();
       }, 1000);
 
