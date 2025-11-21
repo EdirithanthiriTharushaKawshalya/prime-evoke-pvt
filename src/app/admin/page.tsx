@@ -8,7 +8,8 @@ import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CalendarDays, DollarSign, Package, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { LogoutButton } from "@/components/ui/LogoutButton"; // ADDED
+import { LogoutButton } from "@/components/ui/LogoutButton";
+import { Profile } from "@/lib/types"; // Import Profile type
 
 export default async function AdminHub() {
   const cookieStore = await cookies();
@@ -24,7 +25,19 @@ export default async function AdminHub() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) redirect("/login");
 
-  const menuItems = [
+  // --- NEW: Fetch Profile to check Role ---
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("role, full_name")
+    .eq("id", session.user.id)
+    .single();
+
+  const profile = profileData as Profile | null;
+  const userRole = profile?.role ?? "staff";
+  const userName = profile?.full_name || session.user.email || "Unknown User";
+
+  // Define menu items with a 'restricted' flag
+  const allMenuItems = [
     {
       title: "Bookings & Orders",
       description: "Manage client photography sessions and product orders.",
@@ -32,6 +45,7 @@ export default async function AdminHub() {
       href: "/admin/bookings",
       color: "text-blue-500",
       bgColor: "bg-blue-500/10",
+      restricted: false, // Everyone can see
     },
     {
       title: "Financial Records",
@@ -40,6 +54,7 @@ export default async function AdminHub() {
       href: "/admin/financials",
       color: "text-green-500",
       bgColor: "bg-green-500/10",
+      restricted: true, // ONLY Management
     },
     {
       title: "Stock Inventory",
@@ -48,8 +63,14 @@ export default async function AdminHub() {
       href: "/admin/stock",
       color: "text-amber-500",
       bgColor: "bg-amber-500/10",
+      restricted: false, // Everyone can see
     },
   ];
+
+  // Filter items: Show all if management, otherwise filter out restricted ones
+  const menuItems = allMenuItems.filter(item => 
+    userRole === 'management' || !item.restricted
+  );
 
   return (
     <div className="relative min-h-screen flex flex-col">
@@ -57,15 +78,20 @@ export default async function AdminHub() {
       <Header />
       <div className="container mx-auto py-8 px-4 flex-1 flex flex-col">
         
-        {/* ADDED: Logout Button Container */}
+        {/* Logout Button */}
         <div className="flex justify-end mb-4">
           <LogoutButton />
         </div>
 
         <div className="flex-1 flex flex-col justify-center">
-          <div className="mb-10 text-center">
+          <div className="mb-8 text-center">
             <h1 className="text-4xl font-bold tracking-tight mb-2">Admin Overview</h1>
             <p className="text-muted-foreground text-lg">Select a module to manage</p>
+            
+            {/* --- NEW: Moved "Viewing As" label here --- */}
+            <p className="mt-4 text-sm text-muted-foreground">
+              Viewing as: <span className="font-medium text-foreground">{userRole}</span> ({userName})
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto w-full mb-12">

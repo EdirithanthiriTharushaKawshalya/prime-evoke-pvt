@@ -1,5 +1,5 @@
 // app/admin/stock/page.tsx
-import React from "react"; // Added React import for ElementType
+import React from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, AlertTriangle, Droplet, Layers, Frame } from "lucide-react"; // Icons for categories
+import { ArrowLeft, AlertTriangle, Droplet, Layers, Frame } from "lucide-react";
 import Link from "next/link";
 import { StockItem, Profile } from "@/lib/types";
 import { AddStockDialog } from "@/components/ui/AddStockDialog";
@@ -53,7 +53,6 @@ export default async function StockPage() {
   const others = inventory.filter(i => !frames.includes(i) && !papers.includes(i) && !inks.includes(i));
 
   // Helper to render a section
-  // FIXED: Changed 'any' to 'React.ElementType'
   const StockSection = ({ title, items, icon: Icon }: { title: string, items: StockItem[], icon: React.ElementType }) => (
     <div className="mb-10">
       <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -68,7 +67,10 @@ export default async function StockPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <CardTitle className="text-base md:text-lg font-medium">{item.item_name}</CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">Unit: Rs. {item.unit_price.toLocaleString()}</p>
+                  {/* --- HIDDEN FOR STAFF: Unit Price in Header --- */}
+                  {isManagement && (
+                    <p className="text-xs text-muted-foreground mt-1">Unit: Rs. {item.unit_price.toLocaleString()}</p>
+                  )}
                 </div>
                 {/* Management: Edit Icon */}
                 {isManagement && <EditStockDialog item={item} />}
@@ -125,6 +127,7 @@ export default async function StockPage() {
               <p className="text-sm text-muted-foreground">Manage frames, papers, and inks</p>
             </div>
           </div>
+          {/* Management Only: Add Button */}
           {isManagement && <AddStockDialog />}
         </div>
 

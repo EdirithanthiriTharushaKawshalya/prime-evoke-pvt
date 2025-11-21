@@ -12,13 +12,11 @@ import {
   ServicePackage,
   ProductOrder,
 } from "@/lib/types";
-// REMOVED: LogoutButton
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductOrderCard } from "@/components/ui/ProductOrderCard";
-// ADDED: Imports for Back Button
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -52,7 +50,7 @@ const groupProductOrdersByMonth = (orders: ProductOrder[]) => {
 };
 
 export default async function AdminBookingsPage() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -92,7 +90,7 @@ export default async function AdminBookingsPage() {
   if (profileError || !profile) console.error("Error fetching profile:", profileError);
 
   const userRole = profile?.role ?? "staff";
-  const userName = profile?.full_name || session.user.email || "Unknown User";
+  // Removed userName as it is no longer used here
 
   let packages: ServicePackage[] = [];
   const { data: packagesData } = await supabase.from("services").select("*");
@@ -193,9 +191,9 @@ export default async function AdminBookingsPage() {
         <div className="container mx-auto py-6 px-4 md:py-10">
           
           {/* --- Header Section --- */}
-          <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
+          <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6 md:mb-8">
             <div className="flex items-center gap-3">
-              {/* ADDED: Back Button */}
+              {/* Back Button */}
               <Link href="/admin">
                 <Button variant="ghost" size="icon" className="shrink-0">
                   <ArrowLeft className="h-5 w-5" />
@@ -209,16 +207,14 @@ export default async function AdminBookingsPage() {
               </div>
             </div>
             
-            {/* Action Buttons - REMOVED Logout */}
+            {/* Action Buttons */}
             <div className="flex flex-wrap items-center gap-2 md:gap-4">
               <ReportDownloadButton userRole={userRole} />
               <MySalaryDownloadButton />
             </div>
           </div>
 
-          <p className="mb-6 md:mb-8 text-sm text-muted-foreground">
-            Viewing as: <span className="font-medium text-foreground">{userRole}</span> ({userName})
-          </p>
+          {/* REMOVED: "Viewing as" paragraph */}
 
           {fetchError && (
             <p className="text-destructive text-sm mb-4">Error loading data: {fetchError}</p>
@@ -226,6 +222,7 @@ export default async function AdminBookingsPage() {
 
           {/* --- Tabbed Interface --- */}
           <Tabs defaultValue="bookings" className="w-full">
+            {/* ... (tabs content remains the same) ... */}
             <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-6 md:mb-8 rounded-full h-12">
               <TabsTrigger value="bookings" className="rounded-full text-xs md:text-sm">
                 Client Bookings
@@ -235,7 +232,6 @@ export default async function AdminBookingsPage() {
               </TabsTrigger>
             </TabsList>
 
-            {/* --- Bookings Tab --- */}
             <TabsContent value="bookings" className="space-y-8">
               {!fetchError && bookings.length === 0 && (
                 <div className="text-center py-12 px-4">
@@ -270,7 +266,6 @@ export default async function AdminBookingsPage() {
               ))}
             </TabsContent>
 
-            {/* --- Product Orders Tab --- */}
             <TabsContent value="products" className="space-y-8">
               {!fetchError && productOrders.length === 0 && (
                 <div className="text-center py-12 px-4">
