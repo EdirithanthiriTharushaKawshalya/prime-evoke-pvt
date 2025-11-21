@@ -10,17 +10,19 @@ const inter = Inter({ subsets: ["latin"] });
 
 // --- SEO CONFIGURATION ---
 export const metadata: Metadata = {
-  metadataBase: new URL('https://primeevokeofficial.com'), // YOUR NEW DOMAIN
+  metadataBase: new URL('https://primeevokeofficial.com'),
   title: {
     default: "Prime Evoke | Creative Production House",
-    template: "%s | Prime Evoke" // Child pages will look like "Gallery | Prime Evoke"
+    template: "%s | Prime Evoke"
   },
   description: "Professional photography, videography, and audio production services. Home to Evoke Gallery, Studio Zine, and Evoke Waves.",
-  keywords: ["Photography", "Wedding Photography", "Studio Zine", "Evoke Gallery", "Music Production", "Sri Lanka"], // Add your location
+  keywords: ["Photography", "Wedding Photography", "Studio Zine", "Evoke Gallery", "Music Production", "Sri Lanka"],
   authors: [{ name: "Prime Evoke Private Limited" }],
   creator: "Prime Evoke",
+  // --- UPDATED VERIFICATION ---
   verification: {
-    google: 'google-site-verification=IB8ZGnFFxTrof-mNspRRClDTxoZGmiazDHgWFLJdO1I',
+    // Paste ONLY the code inside the content="" quotes
+    google: 'IB8ZGnFFxTrof-mNspRRClDTxoZGmiazDHgWFLJdO1I', 
   },
   openGraph: {
     type: "website",
@@ -31,7 +33,7 @@ export const metadata: Metadata = {
     description: "The professional hub for Prime Evoke's creative ventures in photography, visual storytelling, and music production.",
     images: [
       {
-        url: "/og-image.jpg", // You need to add an image to your public folder
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "Prime Evoke Preview",
@@ -52,7 +54,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={inter.className}>
-        <JsonLd /> {/* Structured Data for Google */}
+        <JsonLd />
         <div className="relative flex min-h-screen flex-col">
           <AOSInitializer />
           <main className="flex-1">{children}</main>
