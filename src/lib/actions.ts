@@ -10,8 +10,7 @@ import {
   OrderedItem, 
   ProductOrder,
   ProductOrderPhotographerCommission,
-  FinancialRecord, 
-  StockItem 
+  FinancialRecord 
 } from '@/lib/types';
 
 // --- generateMonthlyReport function ---
@@ -1078,20 +1077,13 @@ export async function submitProductOrder(formData: {
 
         if (orderError) throw orderError;
 
-        // 2. PROCESS STOCK REDUCTION (New Logic)
-        // We loop through ordered items and try to deduct stock
-        
-        const stockUpdates = [];
-
+        // 2. PROCESS STOCK REDUCTION
         for (const item of formData.ordered_items) {
-            // Construct a search term. e.g., "12x18" and "Frame"
-            // This logic tries to find a stock item that matches the product description
             let categoryToSearch = '';
-            let sizeToSearch = item.size; // e.g., "12x18"
+            const sizeToSearch = item.size; 
 
             if (item.type === 'frame') categoryToSearch = 'Frame';
             else if (item.type === 'print') categoryToSearch = 'Paper';
-            // Albums are complex, skipping for now or treat as specific stock item
 
             if (categoryToSearch) {
                 // Find stock item that matches Category AND contains the Size in its name
@@ -1107,7 +1099,7 @@ export async function submitProductOrder(formData: {
                     const qtyToReduce = item.quantity;
                     const newQuantity = stockItem.quantity - qtyToReduce;
 
-                    // Perform update if we have enough stock (or allow negative for backorder tracking)
+                    // Perform update
                     const { error: stockError } = await supabase
                         .from('inventory_stock')
                         .update({ 
@@ -1132,11 +1124,11 @@ export async function submitProductOrder(formData: {
         }
 
         revalidatePath('/admin/bookings');
-        revalidatePath('/admin/stock'); // Refresh stock page too
+        revalidatePath('/admin/stock');
         
         return { success: true, orderId: orderData?.order_id };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Product order submission error:", error);
         const message = error instanceof Error ? error.message : "An unexpected error occurred.";
         return { error: message };
@@ -1655,7 +1647,15 @@ export async function restockItem(id: number, amountToAdd: number, currentQty: n
 }
 
 // 3. Edit Item Details (Name, Price, etc.)
-export async function updateStockItem(id: number, data: any) {
+export async function updateStockItem(
+  id: number, 
+  data: {
+    item_name?: string;
+    category?: string;
+    unit_price?: number;
+    reorder_level?: number;
+  }
+) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

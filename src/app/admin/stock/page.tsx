@@ -1,4 +1,5 @@
 // app/admin/stock/page.tsx
+import React from "react"; // Added React import for ElementType
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -52,7 +53,8 @@ export default async function StockPage() {
   const others = inventory.filter(i => !frames.includes(i) && !papers.includes(i) && !inks.includes(i));
 
   // Helper to render a section
-  const StockSection = ({ title, items, icon: Icon }: { title: string, items: StockItem[], icon: any }) => (
+  // FIXED: Changed 'any' to 'React.ElementType'
+  const StockSection = ({ title, items, icon: Icon }: { title: string, items: StockItem[], icon: React.ElementType }) => (
     <div className="mb-10">
       <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
         <Icon className="h-5 w-5 text-muted-foreground" /> {title}
