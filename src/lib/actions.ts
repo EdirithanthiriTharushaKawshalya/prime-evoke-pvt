@@ -1034,7 +1034,7 @@ export async function submitProductOrder(formData: {
     customer_mobile: string | null;
     ordered_items: OrderedItem[];
     total_amount: number;
-    studio_slug: string; // <-- ADDED
+    studio_slug: string; 
 }) {
     const cookieStore = await cookies();
 
@@ -1050,7 +1050,6 @@ export async function submitProductOrder(formData: {
         }
     );
 
-    // Generate a unique Order ID
     const generateOrderId = (): string => {
         const timestamp = Date.now().toString(36);
         const random = Math.random().toString(36).substring(2, 8);
@@ -1060,7 +1059,8 @@ export async function submitProductOrder(formData: {
     const orderId = generateOrderId();
 
     try {
-        const { data, error } = await supabase
+        // 1. Create the Product Order
+        const { data: orderData, error: orderError } = await supabase
             .from('product_orders')
             .insert([{
                 order_id: orderId,
@@ -1070,18 +1070,73 @@ export async function submitProductOrder(formData: {
                 ordered_items: formData.ordered_items,
                 total_amount: formData.total_amount,
                 status: 'New',
-                studio_slug: formData.studio_slug, // <-- ADDED
-                assigned_photographers: [], // <-- ADDED (initialize as empty)
+                studio_slug: formData.studio_slug, 
+                assigned_photographers: [], 
             }])
             .select('id, order_id')
             .single();
 
-        if (error) throw error;
+        if (orderError) throw orderError;
+
+        // 2. PROCESS STOCK REDUCTION (New Logic)
+        // We loop through ordered items and try to deduct stock
+        
+        const stockUpdates = [];
+
+        for (const item of formData.ordered_items) {
+            // Construct a search term. e.g., "12x18" and "Frame"
+            // This logic tries to find a stock item that matches the product description
+            let categoryToSearch = '';
+            let sizeToSearch = item.size; // e.g., "12x18"
+
+            if (item.type === 'frame') categoryToSearch = 'Frame';
+            else if (item.type === 'print') categoryToSearch = 'Paper';
+            // Albums are complex, skipping for now or treat as specific stock item
+
+            if (categoryToSearch) {
+                // Find stock item that matches Category AND contains the Size in its name
+                const { data: stockItems } = await supabase
+                    .from('inventory_stock')
+                    .select('*')
+                    .eq('category', categoryToSearch)
+                    .ilike('item_name', `%${sizeToSearch}%`) // Case-insensitive match for size
+                    .limit(1);
+
+                if (stockItems && stockItems.length > 0) {
+                    const stockItem = stockItems[0];
+                    const qtyToReduce = item.quantity;
+                    const newQuantity = stockItem.quantity - qtyToReduce;
+
+                    // Perform update if we have enough stock (or allow negative for backorder tracking)
+                    const { error: stockError } = await supabase
+                        .from('inventory_stock')
+                        .update({ 
+                            quantity: newQuantity, 
+                            last_updated: new Date().toISOString() 
+                        })
+                        .eq('id', stockItem.id);
+
+                    if (!stockError) {
+                        // Record Movement
+                        await supabase.from('inventory_movements').insert({
+                            stock_item_id: stockItem.id,
+                            type: 'Sale',
+                            quantity_change: -qtyToReduce, // Negative for sale
+                            previous_quantity: stockItem.quantity,
+                            new_quantity: newQuantity,
+                            notes: `Order ${orderId} - ${item.type}`
+                        });
+                    }
+                }
+            }
+        }
 
         revalidatePath('/admin/bookings');
-        return { success: true, orderId: data?.order_id };
+        revalidatePath('/admin/stock'); // Refresh stock page too
+        
+        return { success: true, orderId: orderData?.order_id };
 
-    } catch (error: unknown) {
+    } catch (error: any) {
         console.error("Product order submission error:", error);
         const message = error instanceof Error ? error.message : "An unexpected error occurred.";
         return { error: message };
