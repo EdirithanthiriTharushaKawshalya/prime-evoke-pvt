@@ -1077,20 +1077,30 @@ export async function submitProductOrder(formData: {
 
         if (orderError) throw orderError;
 
-        // 2. PROCESS STOCK REDUCTION
+        // 2. PROCESS STOCK REDUCTION (Updated Logic)
+        
         for (const item of formData.ordered_items) {
-            let categoryToSearch = '';
-            const sizeToSearch = item.size; 
+            const sizeToSearch = item.size; // e.g., "12x18" or "A4"
+            
+            // Determine which categories to reduce based on item type
+            const categoriesToReduce: string[] = [];
 
-            if (item.type === 'frame') categoryToSearch = 'Frame';
-            else if (item.type === 'print') categoryToSearch = 'Paper';
+            if (item.type === 'print') {
+                // Buying a Print -> Reduce Paper
+                categoriesToReduce.push('Paper');
+            } else if (item.type === 'frame') {
+                // Buying a Frame -> Reduce Frame AND Reduce Paper
+                categoriesToReduce.push('Frame');
+                categoriesToReduce.push('Paper');
+            }
 
-            if (categoryToSearch) {
+            // Execute reduction for each required category
+            for (const category of categoriesToReduce) {
                 // Find stock item that matches Category AND contains the Size in its name
                 const { data: stockItems } = await supabase
                     .from('inventory_stock')
                     .select('*')
-                    .eq('category', categoryToSearch)
+                    .eq('category', category)
                     .ilike('item_name', `%${sizeToSearch}%`) // Case-insensitive match for size
                     .limit(1);
 
@@ -1116,7 +1126,7 @@ export async function submitProductOrder(formData: {
                             quantity_change: -qtyToReduce, // Negative for sale
                             previous_quantity: stockItem.quantity,
                             new_quantity: newQuantity,
-                            notes: `Order ${orderId} - ${item.type}`
+                            notes: `Order ${orderId} - ${item.type} (${item.size})`
                         });
                     }
                 }
