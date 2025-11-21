@@ -7,14 +7,15 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Droplet, Layers, Frame } from "lucide-react"; // Icons for categories
 import Link from "next/link";
-import { StockItem } from "@/lib/types";
-// Make sure to create this component (code below)
-import { AddStockDialog } from "@/components/ui/AddStockDialog"; 
+import { StockItem, Profile } from "@/lib/types";
+import { AddStockDialog } from "@/components/ui/AddStockDialog";
+import { RestockDialog } from "@/components/ui/RestockDialog";
+import { EditStockDialog } from "@/components/ui/EditStockDialog";
+import { Badge } from "@/components/ui/badge";
 
 export default async function StockPage() {
-  // FIX: await cookies()
   const cookieStore = await cookies();
   
   const supabase = createServerClient(
@@ -26,63 +27,111 @@ export default async function StockPage() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) redirect("/login");
 
+  // Get User Role
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+  
+  const userRole = (profileData as Profile)?.role || 'staff';
+  const isManagement = userRole === 'management';
+
+  // Fetch Stock
   const { data: stock } = await supabase
     .from("inventory_stock")
     .select("*")
-    .order("category", { ascending: true });
+    .order("item_name", { ascending: true });
 
   const inventory = (stock as StockItem[]) || [];
+
+  // Categorize Items
+  const frames = inventory.filter(i => i.category.toLowerCase().includes('frame'));
+  const papers = inventory.filter(i => i.category.toLowerCase().includes('paper'));
+  const inks = inventory.filter(i => i.category.toLowerCase().includes('ink'));
+  const others = inventory.filter(i => !frames.includes(i) && !papers.includes(i) && !inks.includes(i));
+
+  // Helper to render a section
+  const StockSection = ({ title, items, icon: Icon }: { title: string, items: StockItem[], icon: any }) => (
+    <div className="mb-10">
+      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+        <Icon className="h-5 w-5 text-muted-foreground" /> {title}
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((item) => (
+          <Card key={item.id} className={`border-white/10 bg-card/50 backdrop-blur-sm ${
+            item.quantity <= item.reorder_level ? 'border-amber-500/50 shadow-amber-500/10 shadow-md' : ''
+          }`}>
+            <CardHeader className="pb-2 px-4 pt-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-base md:text-lg font-medium">{item.item_name}</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">Unit: Rs. {item.unit_price.toLocaleString()}</p>
+                </div>
+                {/* Management: Edit Icon */}
+                {isManagement && <EditStockDialog item={item} />}
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <div className="flex items-end justify-between mt-2">
+                <div>
+                  {item.quantity <= item.reorder_level && (
+                    <Badge variant="outline" className="mb-2 text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/50 flex gap-1 w-fit">
+                      <AlertTriangle className="h-3 w-3" /> Low Stock
+                    </Badge>
+                  )}
+                  <div className="text-sm text-muted-foreground">Available</div>
+                  <div className={`text-2xl md:text-3xl font-bold ${
+                    item.quantity <= item.reorder_level ? 'text-amber-500' : 'text-primary'
+                  }`}>
+                    {item.quantity}
+                  </div>
+                </div>
+                {/* Management: Restock Button */}
+                {isManagement && (
+                  <div>
+                    <RestockDialog item={item} />
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        {items.length === 0 && (
+          <div className="col-span-full text-center py-8 text-sm text-muted-foreground bg-muted/10 rounded-lg border border-dashed border-white/10">
+            No items in {title}.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="relative min-h-screen flex flex-col">
       <AnimatedBackground />
       <Header />
-      <div className="container mx-auto py-10 px-4">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+      <div className="container mx-auto py-6 px-4 md:py-10">
+        
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <div className="flex items-center gap-3">
             <Link href="/admin">
-              <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="shrink-0"><ArrowLeft className="h-5 w-5" /></Button>
             </Link>
-            <h1 className="text-3xl font-bold">Inventory Stock</h1>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">Inventory Stock</h1>
+              <p className="text-sm text-muted-foreground">Manage frames, papers, and inks</p>
+            </div>
           </div>
-          <AddStockDialog />
+          {isManagement && <AddStockDialog />}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {inventory.map((item) => (
-            <Card key={item.id} className={`border-white/10 bg-card/50 backdrop-blur-sm ${
-              item.quantity <= item.reorder_level ? 'border-amber-500/50 shadow-amber-500/10 shadow-lg' : ''
-            }`}>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">{item.item_name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{item.category}</p>
-                  </div>
-                  {item.quantity <= item.reorder_level && (
-                    <AlertTriangle className="text-amber-500 h-5 w-5" />
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Quantity</p>
-                    <p className={`text-3xl font-bold ${
-                      item.quantity <= item.reorder_level ? 'text-amber-500' : ''
-                    }`}>
-                      {item.quantity}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Unit Cost</p>
-                    <p className="text-lg">Rs. {item.unit_price.toLocaleString()}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {/* Render Categories */}
+        <StockSection title="Frames" items={frames} icon={Frame} />
+        <StockSection title="Printing Papers" items={papers} icon={Layers} />
+        <StockSection title="Ink Bottles" items={inks} icon={Droplet} />
+        {others.length > 0 && <StockSection title="Other Items" items={others} icon={Layers} />}
+
       </div>
       <Footer />
     </div>

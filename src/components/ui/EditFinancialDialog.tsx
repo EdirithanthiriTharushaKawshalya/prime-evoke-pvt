@@ -1,8 +1,9 @@
-// components/ui/AddFinancialDialog.tsx
+// components/ui/EditFinancialDialog.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { FinancialRecord } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,22 +22,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Edit } from "lucide-react";
 import { toast } from "sonner";
-import { addFinancialRecord } from "@/lib/actions";
+import { updateFinancialRecord } from "@/lib/actions";
 
-export function AddFinancialDialog() {
+interface EditFinancialDialogProps {
+  record: FinancialRecord;
+}
+
+export function EditFinancialDialog({ record }: EditFinancialDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
-    description: "",
-    type: "Expense",
-    category: "",
-    amount: "",
-    payment_method: "Cash",
+    date: record.date,
+    description: record.description,
+    type: record.type,
+    category: record.category,
+    amount: record.amount.toString(),
+    payment_method: record.payment_method || "Cash",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,28 +49,20 @@ export function AddFinancialDialog() {
     setLoading(true);
 
     try {
-      const result = await addFinancialRecord({
+      const result = await updateFinancialRecord(record.id, {
         date: formData.date,
         description: formData.description,
-        type: formData.type as "Income" | "Expense",
+        type: formData.type as 'Income' | 'Expense',
         category: formData.category,
         amount: parseFloat(formData.amount),
         payment_method: formData.payment_method,
       });
 
       if (result.error) {
-        toast.error("Failed to add record", { description: result.error });
+        toast.error("Update Failed", { description: result.error });
       } else {
-        toast.success("Record Added Successfully");
+        toast.success("Record Updated Successfully");
         setOpen(false);
-        setFormData({
-          date: new Date().toISOString().split("T")[0],
-          description: "",
-          type: "Expense",
-          category: "",
-          amount: "",
-          payment_method: "Cash",
-        });
         router.refresh();
       }
     } catch {
@@ -78,14 +75,13 @@ export function AddFinancialDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 w-full sm:w-auto">
-          <Plus className="h-4 w-4" /> Add Record
+        <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+          <Edit className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      {/* Responsive Content Container */}
       <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-lg">
         <DialogHeader>
-          <DialogTitle>Add Financial Record</DialogTitle>
+          <DialogTitle>Edit Financial Record</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="space-y-2">
@@ -103,7 +99,7 @@ export function AddFinancialDialog() {
             <Label htmlFor="type">Type</Label>
             <Select
               value={formData.type}
-              onValueChange={(val) => setFormData({ ...formData, type: val })}
+              onValueChange={(val) => setFormData({ ...formData, type: val as 'Income' | 'Expense' })}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -121,7 +117,6 @@ export function AddFinancialDialog() {
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="What is this for?"
               required
             />
           </div>
@@ -130,7 +125,6 @@ export function AddFinancialDialog() {
             <Label htmlFor="category">Category</Label>
             <Input
               id="category"
-              placeholder="e.g. Rent, Utilities"
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               required
@@ -146,7 +140,6 @@ export function AddFinancialDialog() {
                 step="0.01"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                placeholder="0.00"
                 required
               />
             </div>
@@ -174,7 +167,7 @@ export function AddFinancialDialog() {
                 Cancel
             </Button>
             <Button type="submit" disabled={loading} className="w-full sm:w-auto">
-              {loading ? "Saving..." : "Save Record"}
+              {loading ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </form>
