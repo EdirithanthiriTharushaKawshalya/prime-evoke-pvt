@@ -77,14 +77,14 @@ export async function StudioFooter({ studioId }: { studioId: string }) {
       <div className="border-t border-white/10">
         <div className="container mx-auto px-6 py-6 text-sm text-muted-foreground flex flex-col md:flex-row justify-between items-center">
           <p>
-            © {currentYear} {studioData.name}. All Rights Reserved. Part of{" "}
+            {studioData.name}™
+          </p>
+          <p>
+            Part of{" "}
             <Link href="/" className="underline hover:text-white">
               Prime Evoke Private Limited
             </Link>
             .
-          </p>
-          <p className="mt-2 md:mt-0">
-            Designed and developed by Tharusha Kawshalya
           </p>
         </div>
       </div>
