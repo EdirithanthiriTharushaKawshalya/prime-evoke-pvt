@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, AlertTriangle, Droplet, Layers, Frame } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Droplet, Layers, Frame, Sparkles } from "lucide-react"; // Added Sparkles for Lamination
 import Link from "next/link";
 import { StockItem, Profile } from "@/lib/types";
 import { AddStockDialog } from "@/components/ui/AddStockDialog";
@@ -28,7 +28,6 @@ export default async function StockPage() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) redirect("/login");
 
-  // Get User Role
   const { data: profileData } = await supabase
     .from("profiles")
     .select("role")
@@ -38,7 +37,6 @@ export default async function StockPage() {
   const userRole = (profileData as Profile)?.role || 'staff';
   const isManagement = userRole === 'management';
 
-  // Fetch Stock
   const { data: stock } = await supabase
     .from("inventory_stock")
     .select("*")
@@ -46,13 +44,18 @@ export default async function StockPage() {
 
   const inventory = (stock as StockItem[]) || [];
 
-  // Categorize Items
+  // --- UPDATED CATEGORIES ---
   const frames = inventory.filter(i => i.category.toLowerCase().includes('frame'));
   const papers = inventory.filter(i => i.category.toLowerCase().includes('paper'));
   const inks = inventory.filter(i => i.category.toLowerCase().includes('ink'));
-  const others = inventory.filter(i => !frames.includes(i) && !papers.includes(i) && !inks.includes(i));
+  const laminations = inventory.filter(i => i.category.toLowerCase().includes('lamination')); // New Category
+  const others = inventory.filter(i => 
+    !frames.includes(i) && 
+    !papers.includes(i) && 
+    !inks.includes(i) && 
+    !laminations.includes(i)
+  );
 
-  // Helper to render a section
   const StockSection = ({ title, items, icon: Icon }: { title: string, items: StockItem[], icon: React.ElementType }) => (
     <div className="mb-10">
       <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -67,12 +70,10 @@ export default async function StockPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <CardTitle className="text-base md:text-lg font-medium">{item.item_name}</CardTitle>
-                  {/* --- HIDDEN FOR STAFF: Unit Price in Header --- */}
                   {isManagement && (
                     <p className="text-xs text-muted-foreground mt-1">Unit: Rs. {item.unit_price.toLocaleString()}</p>
                   )}
                 </div>
-                {/* Management: Edit Icon */}
                 {isManagement && <EditStockDialog item={item} />}
               </div>
             </CardHeader>
@@ -91,7 +92,6 @@ export default async function StockPage() {
                     {item.quantity}
                   </div>
                 </div>
-                {/* Management: Restock Button */}
                 {isManagement && (
                   <div>
                     <RestockDialog item={item} />
@@ -115,8 +115,6 @@ export default async function StockPage() {
       <AnimatedBackground />
       <Header />
       <div className="container mx-auto py-6 px-4 md:py-10">
-        
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <Link href="/admin">
@@ -124,17 +122,16 @@ export default async function StockPage() {
             </Link>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">Inventory Stock</h1>
-              <p className="text-sm text-muted-foreground">Manage frames, papers, and inks</p>
+              <p className="text-sm text-muted-foreground">Manage frames, papers, inks, and lamination</p>
             </div>
           </div>
-          {/* Management Only: Add Button */}
           {isManagement && <AddStockDialog />}
         </div>
 
-        {/* Render Categories */}
         <StockSection title="Frames" items={frames} icon={Frame} />
         <StockSection title="Printing Papers" items={papers} icon={Layers} />
         <StockSection title="Ink Bottles" items={inks} icon={Droplet} />
+        <StockSection title="Lamination" items={laminations} icon={Sparkles} /> {/* New Section */}
         {others.length > 0 && <StockSection title="Other Items" items={others} icon={Layers} />}
 
       </div>

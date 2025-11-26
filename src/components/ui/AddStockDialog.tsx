@@ -81,12 +81,11 @@ export function AddStockDialog() {
         </Button>
       </DialogTrigger>
       
-      {/* Responsive Dialog: Full width on mobile, max-height with scroll */}
       <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-lg">
         <DialogHeader>
           <DialogTitle>Add Inventory Item</DialogTitle>
           <DialogDescription>
-            Add new products to your stock inventory.
+            Add manual stock items (Ink, Lamination). Frames and Papers are added automatically.
           </DialogDescription>
         </DialogHeader>
         
@@ -96,7 +95,7 @@ export function AddStockDialog() {
             <Label htmlFor="item_name">Item Name</Label>
             <Input
               id="item_name"
-              placeholder="e.g. 12x18 Matte Paper"
+              placeholder="e.g. A4 Matte Lamination Roll"
               value={formData.item_name}
               onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
               required
@@ -113,15 +112,14 @@ export function AddStockDialog() {
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Frame">Frame</SelectItem>
-                <SelectItem value="Paper">Paper</SelectItem>
+                {/* REMOVED Frame and Paper to prevent manual duplicates */}
                 <SelectItem value="Ink">Ink</SelectItem>
+                <SelectItem value="Lamination">Lamination</SelectItem>
                 <SelectItem value="Other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Two columns for Quantity and Price */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantity</Label>
@@ -158,9 +156,6 @@ export function AddStockDialog() {
               onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })}
               required
             />
-            <p className="text-[10px] text-muted-foreground">
-              We will warn you when stock drops below this number.
-            </p>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0 mt-2">
