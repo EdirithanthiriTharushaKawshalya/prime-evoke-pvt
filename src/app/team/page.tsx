@@ -1,24 +1,22 @@
-import { getTeamMembers } from "@/lib/data"; // You'll create this function
+// src/app/team/page.tsx
+import { getTeamMembers } from "@/lib/data";
 import { TeamMemberCard } from "@/components/ui/TeamMemberCard";
-import { Dialog } from "@/components/ui/dialog"; // Import Dialog
+import { Dialog } from "@/components/ui/dialog";
 import { Footer } from "@/components/layout/Footer";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 
-// 1. Remove 'params' from the function signature
 export default async function TeamPage() {
-  // 2. Remove the line that extracts 'studioId'
-  // const { studioId } = await params; // DELETE THIS LINE
+  const allTeamMembers = await getTeamMembers();
 
-  const teamMembers = await getTeamMembers();
+  // Filter out the "Other" placeholder account so it doesn't show on the website
+  const visibleMembers = allTeamMembers.filter(m => m.name !== "Other");
 
-  const management = teamMembers.filter(m => m.is_management);
-  const staff = teamMembers.filter(m => !m.is_management);
+  const management = visibleMembers.filter(m => m.is_management);
+  const staff = visibleMembers.filter(m => !m.is_management);
 
   return (
     <Dialog>
-      {" "}
-      {/* Wrap the whole page or relevant section in the Dialog provider */}
       <AnimatedBackground />
       <Header />
       <div className="container mx-auto py-16 px-4">
