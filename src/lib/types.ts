@@ -220,3 +220,39 @@ export type StockItem = {
   reorder_level: number;
   last_updated: string;
 };
+
+export type RentalEquipment = {
+  id: number;
+  created_at: string;
+  name: string;
+  category: string; // 'Camera', 'Lens', 'Lighting', 'Audio', 'Support'
+  description: string | null;
+  daily_rate: number;
+  quantity_total: number;
+  image_url: string | null;
+  is_active: boolean;
+};
+
+export type RentalBooking = {
+  id: number;
+  created_at: string;
+  booking_id: string;
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  start_date: string;
+  end_date: string;
+  status: 'Pending' | 'Confirmed' | 'Active' | 'Completed' | 'Cancelled';
+  total_amount: number;
+  notes: string | null;
+  // We will join items in the query
+  items?: RentalOrderItem[]; 
+};
+
+export type RentalOrderItem = {
+  id: number;
+  equipment_name: string;
+  quantity: number;
+  days_rented: number;
+  daily_rate_snapshot: number;
+};

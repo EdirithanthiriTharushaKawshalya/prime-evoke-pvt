@@ -6,7 +6,7 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CalendarDays, DollarSign, Package, ArrowRight } from "lucide-react";
+import { CalendarDays, DollarSign, Package, ArrowRight, Camera } from "lucide-react";
 import Link from "next/link";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { Profile } from "@/lib/types"; // Import Profile type
@@ -47,6 +47,17 @@ export default async function AdminHub() {
       bgColor: "bg-blue-500/10",
       restricted: false, // Everyone can see
     },
+    // --- NEW CARD ---
+    {
+      title: "Rentals Management",
+      description: "Manage equipment bookings and rental fleet inventory.",
+      icon: Camera,
+      href: "/admin/rentals", // We will create this page next
+      color: "text-purple-500",
+      bgColor: "bg-purple-500/10",
+      restricted: false,
+    },
+    // ----------------
     {
       title: "Financial Records",
       description: "Track general income, expenses, and other company transactions.",

@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import Link from "next/link";
+import { Camera } from "lucide-react"; // Import icon
 
 export default function HomePage() {
   return (
@@ -35,7 +36,8 @@ export default function HomePage() {
 
       {/* Sub-Brands Gateway Section */}
       <section className="container mx-auto pb-20 md:pb-32 px-4">
-        <div className="grid grid-cols-1 gap-8 max-w-4xl mx-auto">
+        {/* Changed grid to 2 columns on tablet/desktop to accommodate 4 items nicely */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
           {/* Evoke Gallery Card */}
           {/* 2. Added fade-up animation with delay */}
           <Card
@@ -100,6 +102,30 @@ export default function HomePage() {
             <CardFooter className="flex justify-center p-8 md:pt-0">
               <Button asChild>
                 <Link href="/evoke-waves">Learn More</Link>
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* --- NEW CARD: Evoke Rentals --- */}
+          <Card
+            className="flex flex-col rounded-3xl text-center border-white/10 bg-card/40 backdrop-blur-sm"
+            data-aos="fade-up"
+            data-aos-delay="400"
+          >
+            <CardHeader className="flex-1 p-8 md:p-12">
+              <div className="mx-auto bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-6">
+                <Camera className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">Evoke Rentals</CardTitle>
+              <CardDescription>Premium Equipment Hire</CardDescription>
+              <p className="text-muted-foreground mt-4">
+                Access our professional arsenal. Cameras, lenses, lighting, and
+                support gear available for your own productions.
+              </p>
+            </CardHeader>
+            <CardFooter className="flex justify-center p-8 md:pt-0">
+              <Button asChild variant="outline" className="border-primary/50 hover:bg-primary/10">
+                <Link href="/rentals">Browse Equipment</Link>
               </Button>
             </CardFooter>
           </Card>

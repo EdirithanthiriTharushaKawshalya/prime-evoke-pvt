@@ -12,6 +12,8 @@ import {
   ProductOrderPhotographerCommission,
   FinancialRecord 
 } from '@/lib/types';
+import { RentalEquipment } from '@/lib/types';
+import { RentalBooking, RentalOrderItem } from '@/lib/types';
 
 // --- generateMonthlyReport function ---
 export async function generateMonthlyReport(month: string, year: string) {
@@ -1709,4 +1711,174 @@ export async function deleteStockItem(id: number) {
   if (error) return { error: error.message };
   revalidatePath('/admin/stock');
   return { success: true };
+}
+
+// --- RENTAL INVENTORY ACTIONS ---
+
+export async function addRentalEquipment(data: Omit<RentalEquipment, 'id' | 'created_at' | 'is_active'>) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Auth Check (Management Only)
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  const { error } = await supabase.from('rental_equipment').insert([data]);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/rentals');
+  return { success: true };
+}
+
+export async function updateRentalEquipment(id: number, data: Partial<RentalEquipment>) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Auth Check (Management Only)
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  const { error } = await supabase.from('rental_equipment').update(data).eq('id', id);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/rentals');
+  return { success: true };
+}
+
+export async function deleteRentalEquipment(id: number) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Auth Check (Management Only)
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  const { error } = await supabase.from('rental_equipment').delete().eq('id', id);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/rentals');
+  return { success: true };
+}
+
+// --- RENTAL BOOKING ACTIONS ---
+
+export async function updateRentalBookingStatus(id: number, status: string) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Auth Check (Management Only)
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  const { error } = await supabase.from('rental_bookings').update({ status }).eq('id', id);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/rentals');
+  return { success: true };
+}
+
+// --- CLIENT RENTAL ACTIONS ---
+
+export async function submitRentalBooking(formData: {
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  start_date: string;
+  end_date: string;
+  items: { id: number; name: string; daily_rate: number; quantity: number }[];
+  total_amount: number;
+  notes?: string;
+}) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  const generateBookingId = (): string => {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 6);
+    return `RNT-${timestamp}-${random}`.toUpperCase();
+  };
+
+  const bookingId = generateBookingId();
+
+  try {
+    // 1. Create the Main Booking Record
+    const { data: bookingData, error: bookingError } = await supabase
+      .from('rental_bookings')
+      .insert([{
+        booking_id: bookingId,
+        client_name: formData.client_name,
+        client_email: formData.client_email,
+        client_phone: formData.client_phone,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        status: 'Pending',
+        total_amount: formData.total_amount,
+        notes: formData.notes || '',
+      }])
+      .select('id')
+      .single();
+
+    if (bookingError) throw bookingError;
+
+    // 2. Calculate rental duration in days
+    const start = new Date(formData.start_date);
+    const end = new Date(formData.end_date);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    // Minimum 1 day rental
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; 
+
+    // 3. Create Order Items
+    const orderItems = formData.items.map(item => ({
+      booking_id: bookingData.id,
+      equipment_id: item.id,
+      equipment_name: item.name,
+      quantity: item.quantity,
+      daily_rate_snapshot: item.daily_rate,
+      days_rented: diffDays
+    }));
+
+    const { error: itemsError } = await supabase
+      .from('rental_order_items')
+      .insert(orderItems);
+
+    if (itemsError) throw itemsError;
+
+    // Revalidate admin dashboard so you see the new booking immediately
+    revalidatePath('/admin/rentals');
+    
+    return { success: true, bookingId: bookingId };
+
+  } catch (error: any) {
+    console.error("Rental submission error:", error);
+    const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+    return { error: message };
+  }
 }
