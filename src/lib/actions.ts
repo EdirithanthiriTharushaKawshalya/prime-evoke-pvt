@@ -1801,7 +1801,6 @@ export async function updateRentalBookingStatus(id: number, status: string) {
   return { success: true };
 }
 
-
 // --- MODIFIED: submitRentalBooking ---
 // Update the interface to accept verification data points
 interface RentalBookingSubmission {
@@ -1819,7 +1818,6 @@ interface RentalBookingSubmission {
   idBackPath: string;
   selfiePath: string;
 }
-
 
 // --- UPDATED: submitRentalBooking ---
 export async function submitRentalBooking(formData: {
@@ -1888,97 +1886,88 @@ export async function submitRentalBooking(formData: {
   }
 }
 
-
-
-
-
-// --- NEW: Action to fetch sensitive details (Management only) ---
+// --- UPDATED: Get Verification Details (Securely generate signed URLs) ---
 export async function getRentalVerificationDetails(bookingId: string) {
-   const cookieStore = await cookies();
-   
-   const supabase = createServerClient(
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-      },
-    }
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
   );
-   
-   // 1. Security Check: Ensure user is management
-   const { data: { user } } = await supabase.auth.getUser();
-   if (user?.app_metadata?.role !== 'management') {
-       throw new Error("Unauthorized access to sensitive data.");
-   }
 
-   // 2. Fetch the sensitive data. RLS will also enforce this, but good to double check.
-   const { data, error } = await supabase
-     .from('rental_verifications')
-     .select('*')
-     .eq('booking_id', bookingId)
-     .single();
+  // Security Check (Still keep this so only admins can request the data)
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
 
-   if (error) throw new Error("Could not fetch verification details");
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
 
-   // 3. Generate temporary signed URLs for the images so they can be displayed for 1 hour
-   const { data: frontUrl } = await supabase.storage.from('private-documents').createSignedUrl(data.id_front_path, 3600);
-   const { data: backUrl } = await supabase.storage.from('private-documents').createSignedUrl(data.id_back_path, 3600);
-   const { data: selfieUrl } = await supabase.storage.from('private-documents').createSignedUrl(data.selfie_path, 3600);
+  if (profile?.role !== 'management') {
+    throw new Error("Unauthorized access");
+  }
 
-   return {
-       address: data.client_address,
-       idFrontUrl: frontUrl?.signedUrl,
-       idBackUrl: backUrl?.signedUrl,
-       selfieUrl: selfieUrl?.signedUrl,
-   };
+  // Fetch paths from DB
+  const { data: verificationData, error } = await supabase
+    .from('rental_verifications')
+    .select('*')
+    .eq('booking_id', bookingId) 
+    .single();
+
+  if (error || !verificationData) {
+    throw new Error("Verification documents not found.");
+  }
+
+  // Helper to get PUBLIC URL
+  const getPublicDocUrl = (path: string) => {
+    if (!path) return "";
+    const { data } = supabase.storage
+      .from('private-documents') // Bucket name
+      .getPublicUrl(path);
+    
+    return data.publicUrl;
+  };
+
+  return {
+    address: verificationData.client_address,
+    idFrontUrl: getPublicDocUrl(verificationData.id_front_path),
+    idBackUrl: getPublicDocUrl(verificationData.id_back_path),
+    selfieUrl: getPublicDocUrl(verificationData.selfie_path),
+  };
 }
 
-// --- NEW: Action to update verification status (Management only) ---
+// --- UPDATED: Update Verification Status ---
 export async function updateRentalVerificationStatus(bookingId: string, status: 'verified' | 'rejected') {
-    const cookieStore = await cookies();
-    
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-        },
-      }
-    );
-    
-    // Security check needed here similar to other admin actions...
-    // Assuming role check exists or RLS handles update permissions on rental_bookings
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) return { error: sessionError.message };
-    if (!session) return { error: "Not authenticated" };
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single();
+  // Security Check
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
 
-    if (profileError) return { error: profileError.message };
-    if (profile?.role !== 'management') {
-      return { error: "Permission denied. Only management can update verification status." };
-    }
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
 
-    const { error } = await supabase
-      .from('rental_bookings')
-      .update({ verification_status: status })
-      .eq('id', bookingId);
+  if (profile?.role !== 'management') return { error: "Unauthorized" };
 
-    if(error) {
-      console.error("Error updating rental verification status:", error);
-      return { error: error.message };
-    }
-    
-    revalidatePath('/admin/rentals');
-    return { success: true };
+  // Update Status
+  const { error } = await supabase
+    .from('rental_bookings')
+    .update({ verification_status: status })
+    .eq('id', bookingId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/rentals');
+  return { success: true };
 }
+

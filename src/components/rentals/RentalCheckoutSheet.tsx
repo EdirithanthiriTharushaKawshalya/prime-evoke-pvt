@@ -9,10 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RentalEquipment } from "@/lib/types";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Trash2, Upload, FileText, ArrowLeft, ArrowRight } from "lucide-react";
+import { Calendar, Trash2, Upload, FileText, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { submitRentalBooking } from "@/lib/actions";
-import { supabase } from "@/lib/supabaseClient"; // FIX: Use your existing client
+import { supabase } from "@/lib/supabaseClient"; 
 
 interface RentalCheckoutSheetProps {
   isOpen: boolean;
@@ -73,20 +73,25 @@ export function RentalCheckoutSheet({ isOpen, onClose, cart, equipment, setCart 
     }
   };
 
-  const uploadFileToStorage = async (file: File, type: string): Promise<string> => {
-    // FIX: Using the imported supabase client
+  // Helper to upload files into a specific folder
+  const uploadFileToStorage = async (file: File, folderId: string, type: string): Promise<string> => {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${type}.${fileExt}`;
+    // STRUCTURE: verifications / folder_id / type.jpg
+    const filePath = `verifications/${folderId}/${type}.${fileExt}`;
     
     const { data, error } = await supabase.storage
-      .from('private-documents')
-      .upload(fileName, file);
+      .from('private-documents') // Ensure this bucket exists!
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
 
     if (error) {
+      console.error(`Upload error for ${type}:`, error);
       throw new Error(`Failed to upload ${type}: ${error.message}`);
     }
 
-    return data.path; // Return the path, not the file name
+    return data.path; 
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,21 +105,24 @@ export function RentalCheckoutSheet({ isOpen, onClose, cart, equipment, setCart 
     setLoading(true);
 
     try {
+      // Generate a unique folder ID for this specific submission
+      const submissionFolderId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
       let idFrontPath = "";
       let idBackPath = "";
       let selfiePath = "";
 
-      if (idFrontFile) idFrontPath = await uploadFileToStorage(idFrontFile, 'id_front');
-      if (idBackFile) idBackPath = await uploadFileToStorage(idBackFile, 'id_back');
-      if (selfieFile) selfiePath = await uploadFileToStorage(selfieFile, 'selfie');
+      // Upload files to the structured folder
+      if (idFrontFile) idFrontPath = await uploadFileToStorage(idFrontFile, submissionFolderId, 'id_front');
+      if (idBackFile) idBackPath = await uploadFileToStorage(idBackFile, submissionFolderId, 'id_back');
+      if (selfieFile) selfiePath = await uploadFileToStorage(selfieFile, submissionFolderId, 'selfie');
 
-      // FIX: Map to expected Server Action interface
+      // Prepare items
       const orderItems = selectedItems.map(item => ({
-        equipmentId: item.id.toString(), // Convert to string for server action
+        equipmentId: item.id.toString(),
         quantity: cart[item.id]
       }));
 
-      // Combine address
       const fullAddress = `${formData.address_line1}, ${formData.address_line2 ? formData.address_line2 + ', ' : ''}${formData.city}, ${formData.postal_code}`;
 
       const result = await submitRentalBooking({
@@ -123,7 +131,7 @@ export function RentalCheckoutSheet({ isOpen, onClose, cart, equipment, setCart 
         clientPhone: formData.client_phone,
         startDate: new Date(formData.start_date),
         endDate: new Date(formData.end_date),
-        storeId: "colombo", // Default or passed prop
+        storeId: "colombo", 
         items: orderItems,
         totalCost: estimatedGrandTotal,
         clientAddress: fullAddress,
@@ -136,7 +144,7 @@ export function RentalCheckoutSheet({ isOpen, onClose, cart, equipment, setCart 
         toast.error("Booking Failed", { description: result.error });
       } else {
         toast.success("Booking Request Sent!", { 
-          description: `Your Booking ID: ${result.bookingId}. We will contact you shortly.` 
+          description: `Your Booking ID: ${result.bookingId}. We will review your documents shortly.` 
         });
         setCart({}); 
         onClose();   
@@ -164,9 +172,7 @@ export function RentalCheckoutSheet({ isOpen, onClose, cart, equipment, setCart 
     if (step > 1) setStep(step - 1);
   };
 
-  // ... (Render steps 1, 2, 3 - largely unchanged from your upload, 
-  //      just ensure input bindings use formData) ...
-
+  // ... (Keep existing renderStep1 and renderStep2 logic exactly as they were) ...
   const renderStep1 = () => (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -316,7 +322,7 @@ export function RentalCheckoutSheet({ isOpen, onClose, cart, equipment, setCart 
               </Button>
             )}
             <Button type="submit" className="flex-1 flex items-center gap-2" disabled={loading || (step === 1 && selectedItems.length === 0)}>
-              {loading ? "Processing..." : step === 3 ? <><Upload className="h-4 w-4" /> Submit</> : <><ArrowRight className="h-4 w-4" /> Next</>}
+              {loading ? <><Loader2 className="h-4 w-4 animate-spin"/> Processing...</> : step === 3 ? <><Upload className="h-4 w-4" /> Submit</> : <><ArrowRight className="h-4 w-4" /> Next</>}
             </Button>
           </SheetFooter>
         </form>
