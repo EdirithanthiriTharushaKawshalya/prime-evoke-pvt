@@ -8,11 +8,12 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Camera, Calendar, CheckCircle, XCircle, Clock } from "lucide-react";
+import { ArrowLeft, Camera, Calendar, CheckCircle, XCircle, Clock, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { RentalEquipment, RentalBooking, Profile } from "@/lib/types";
 import { AddEquipmentDialog } from "@/components/ui/AddEquipmentDialog";
 import { Badge } from "@/components/ui/badge";
+import VerificationDialog from "@/components/admin/rentals/VerificationDialog";
 
 export default async function RentalsAdminPage() {
   const cookieStore = await cookies();
@@ -131,7 +132,21 @@ export default async function RentalsAdminPage() {
                     ))}
                   </div>
                   
-                  {/* Action Buttons (Future: Add UpdateStatus Component here) */}
+                  {/* Verification Status Section */}
+                  <div className="flex justify-end gap-2 mt-4">
+                    {isManagement && booking.verification_status === 'pending' && (
+                      <VerificationDialog 
+                        bookingId={booking.id}
+                        clientName={booking.client_name}
+                      />
+                    )}
+
+                    {booking.verification_status === 'verified' && (
+                      <Badge className="bg-green-600">
+                        <CheckCircle className="h-3 w-3 mr-1" /> Verified Client
+                      </Badge>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}

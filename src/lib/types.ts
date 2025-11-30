@@ -245,8 +245,9 @@ export type RentalBooking = {
   status: 'Pending' | 'Confirmed' | 'Active' | 'Completed' | 'Cancelled';
   total_amount: number;
   notes: string | null;
-  // We will join items in the query
   items?: RentalOrderItem[]; 
+  // ADD THIS LINE:
+  verification_status?: 'pending' | 'verified' | 'rejected';
 };
 
 export type RentalOrderItem = {

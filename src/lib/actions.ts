@@ -1801,84 +1801,184 @@ export async function updateRentalBookingStatus(id: number, status: string) {
   return { success: true };
 }
 
-// --- CLIENT RENTAL ACTIONS ---
 
+// --- MODIFIED: submitRentalBooking ---
+// Update the interface to accept verification data points
+interface RentalBookingSubmission {
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  startDate: Date;
+  endDate: Date;
+  storeId: string;
+  items: { equipmentId: string; quantity: number }[];
+  totalCost: number;
+  // NEW FIELDS FOR VERIFICATION
+  clientAddress: string;
+  idFrontPath: string;
+  idBackPath: string;
+  selfiePath: string;
+}
+
+
+// --- UPDATED: submitRentalBooking ---
 export async function submitRentalBooking(formData: {
-  client_name: string;
-  client_email: string;
-  client_phone: string;
-  start_date: string;
-  end_date: string;
-  items: { id: number; name: string; daily_rate: number; quantity: number }[];
-  total_amount: number;
-  notes?: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  startDate: Date;
+  endDate: Date;
+  storeId: string;
+  items: { equipmentId: string; quantity: number }[];
+  totalCost: number;
+  // New Verification Fields
+  clientAddress: string;
+  idFrontPath: string;
+  idBackPath: string;
+  selfiePath: string;
 }) {
   const cookieStore = await cookies();
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
   );
 
-  const generateBookingId = (): string => {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 6);
-    return `RNT-${timestamp}-${random}`.toUpperCase();
-  };
-
-  const bookingId = generateBookingId();
-
   try {
-    // 1. Create the Main Booking Record
-    const { data: bookingData, error: bookingError } = await supabase
-      .from('rental_bookings')
-      .insert([{
-        booking_id: bookingId,
-        client_name: formData.client_name,
-        client_email: formData.client_email,
-        client_phone: formData.client_phone,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        status: 'Pending',
-        total_amount: formData.total_amount,
-        notes: formData.notes || '',
-      }])
-      .select('id')
-      .single();
+    // Call the PostgreSQL function
+    const { data: bookingId, error: bookingError } = await supabase.rpc(
+      'submit_rental_with_verification',
+      {
+        p_client_name: formData.clientName,
+        p_client_email: formData.clientEmail,
+        p_client_phone: formData.clientPhone,
+        p_start_date: formData.startDate.toISOString(),
+        p_end_date: formData.endDate.toISOString(),
+        p_store_id: formData.storeId,
+        p_total_cost: formData.totalCost,
+        p_client_address: formData.clientAddress,
+        p_id_front_path: formData.idFrontPath,
+        p_id_back_path: formData.idBackPath,
+        p_selfie_path: formData.selfiePath,
+        p_items: formData.items,
+      }
+    );
 
-    if (bookingError) throw bookingError;
+    if (bookingError) {
+      console.error("Database Error:", bookingError);
+      throw new Error(bookingError.message);
+    }
 
-    // 2. Calculate rental duration in days
-    const start = new Date(formData.start_date);
-    const end = new Date(formData.end_date);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    // Minimum 1 day rental
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; 
-
-    // 3. Create Order Items
-    const orderItems = formData.items.map(item => ({
-      booking_id: bookingData.id,
-      equipment_id: item.id,
-      equipment_name: item.name,
-      quantity: item.quantity,
-      daily_rate_snapshot: item.daily_rate,
-      days_rented: diffDays
-    }));
-
-    const { error: itemsError } = await supabase
-      .from('rental_order_items')
-      .insert(orderItems);
-
-    if (itemsError) throw itemsError;
-
-    // Revalidate admin dashboard so you see the new booking immediately
     revalidatePath('/admin/rentals');
     
-    return { success: true, bookingId: bookingId };
+    // Return success (ensure ID is a number)
+    return { success: true, bookingId: Number(bookingId) };
 
-  } catch (error: any) {
-    console.error("Rental submission error:", error);
-    const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+  } catch (error: unknown) {
+    console.error("Submit Rental Error:", error);
+    const message = error instanceof Error ? error.message : "Failed to submit booking.";
     return { error: message };
   }
+}
+
+
+
+
+
+// --- NEW: Action to fetch sensitive details (Management only) ---
+export async function getRentalVerificationDetails(bookingId: string) {
+   const cookieStore = await cookies();
+   
+   const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+   
+   // 1. Security Check: Ensure user is management
+   const { data: { user } } = await supabase.auth.getUser();
+   if (user?.app_metadata?.role !== 'management') {
+       throw new Error("Unauthorized access to sensitive data.");
+   }
+
+   // 2. Fetch the sensitive data. RLS will also enforce this, but good to double check.
+   const { data, error } = await supabase
+     .from('rental_verifications')
+     .select('*')
+     .eq('booking_id', bookingId)
+     .single();
+
+   if (error) throw new Error("Could not fetch verification details");
+
+   // 3. Generate temporary signed URLs for the images so they can be displayed for 1 hour
+   const { data: frontUrl } = await supabase.storage.from('private-documents').createSignedUrl(data.id_front_path, 3600);
+   const { data: backUrl } = await supabase.storage.from('private-documents').createSignedUrl(data.id_back_path, 3600);
+   const { data: selfieUrl } = await supabase.storage.from('private-documents').createSignedUrl(data.selfie_path, 3600);
+
+   return {
+       address: data.client_address,
+       idFrontUrl: frontUrl?.signedUrl,
+       idBackUrl: backUrl?.signedUrl,
+       selfieUrl: selfieUrl?.signedUrl,
+   };
+}
+
+// --- NEW: Action to update verification status (Management only) ---
+export async function updateRentalVerificationStatus(bookingId: string, status: 'verified' | 'rejected') {
+    const cookieStore = await cookies();
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value;
+          },
+        },
+      }
+    );
+    
+    // Security check needed here similar to other admin actions...
+    // Assuming role check exists or RLS handles update permissions on rental_bookings
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) return { error: sessionError.message };
+    if (!session) return { error: "Not authenticated" };
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError) return { error: profileError.message };
+    if (profile?.role !== 'management') {
+      return { error: "Permission denied. Only management can update verification status." };
+    }
+
+    const { error } = await supabase
+      .from('rental_bookings')
+      .update({ verification_status: status })
+      .eq('id', bookingId);
+
+    if(error) {
+      console.error("Error updating rental verification status:", error);
+      return { error: error.message };
+    }
+    
+    revalidatePath('/admin/rentals');
+    return { success: true };
 }
