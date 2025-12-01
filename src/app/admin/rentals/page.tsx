@@ -8,12 +8,15 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Camera, Calendar, CheckCircle, XCircle, Clock, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Camera, Calendar, CheckCircle, XCircle, Clock, ShieldAlert, MapPin, Image as ImageIcon } from "lucide-react"; 
 import Link from "next/link";
+import Image from "next/image"; // <--- 1. Import Image
 import { RentalEquipment, RentalBooking, Profile } from "@/lib/types";
 import { AddEquipmentDialog } from "@/components/ui/AddEquipmentDialog";
 import { Badge } from "@/components/ui/badge";
 import VerificationDialog from "@/components/admin/rentals/VerificationDialog";
+import { RentalBookingActions } from "@/components/admin/rentals/BookingActions";
+import { InventoryActions } from "@/components/admin/rentals/InventoryActions";
 
 export default async function RentalsAdminPage() {
   const cookieStore = await cookies();
@@ -51,6 +54,12 @@ export default async function RentalsAdminPage() {
     .order("created_at", { ascending: false });
 
   const bookings = (bookingsData as RentalBooking[]) || [];
+
+  // Helper to format store name
+  const formatStoreId = (id: string | undefined) => {
+    if (!id) return "Unknown";
+    return id.charAt(0).toUpperCase() + id.slice(1);
+  };
 
   return (
     <div className="relative min-h-screen flex flex-col">
@@ -90,8 +99,15 @@ export default async function RentalsAdminPage() {
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <CardTitle className="text-lg">{booking.client_name}</CardTitle>
+                        
+                        {/* STORE LOCATION BADGE */}
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20 flex items-center gap-1 text-[10px] uppercase tracking-wider">
+                           <MapPin className="h-3 w-3" />
+                           {formatStoreId(booking.store_id)}
+                        </Badge>
+
                         <Badge variant={
                           booking.status === 'Confirmed' ? 'default' : 
                           booking.status === 'Active' ? 'secondary' :
@@ -132,20 +148,25 @@ export default async function RentalsAdminPage() {
                     ))}
                   </div>
                   
-                  {/* Verification Status Section */}
-                  <div className="flex justify-end gap-2 mt-4">
-                    {isManagement && booking.verification_status === 'pending' && (
-                      <VerificationDialog 
-                        bookingId={booking.id}
-                        clientName={booking.client_name}
-                      />
-                    )}
+                  <div className="flex justify-between items-center mt-4 border-t border-white/5 pt-4">
+                      {/* Left Side: Actions */}
+                      {isManagement && <RentalBookingActions booking={booking} />}
 
-                    {booking.verification_status === 'verified' && (
-                      <Badge className="bg-green-600">
-                        <CheckCircle className="h-3 w-3 mr-1" /> Verified Client
-                      </Badge>
-                    )}
+                      {/* Right Side: Verification */}
+                      <div className="flex gap-2">
+                          {isManagement && booking.verification_status === 'pending' && (
+                              <VerificationDialog 
+                                bookingId={booking.id}
+                                clientName={booking.client_name}
+                              />
+                          )}
+
+                          {booking.verification_status === 'verified' && (
+                              <Badge className="bg-green-600">
+                                <CheckCircle className="h-3 w-3 mr-1" /> Verified Client
+                              </Badge>
+                          )}
+                      </div>
                   </div>
                 </CardContent>
               </Card>
@@ -163,13 +184,36 @@ export default async function RentalsAdminPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {inventory.map((item) => (
-                    <Card key={item.id} className="border-white/10 bg-card/50 backdrop-blur-sm">
+                    <Card key={item.id} className="border-white/10 bg-card/50 backdrop-blur-sm overflow-hidden">
+                        
+                        {/* 2. INSERT IMAGE HERE */}
+                        <div className="relative w-full h-32 bg-black/20 border-b border-white/5">
+                            {item.image_url ? (
+                                <Image 
+                                    src={item.image_url} 
+                                    alt={item.name} 
+                                    fill 
+                                    className="object-cover transition-transform hover:scale-105"
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-muted-foreground">
+                                    <ImageIcon className="h-8 w-8 opacity-20" />
+                                </div>
+                            )}
+                        </div>
+
                         <CardHeader className="pb-2">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <Badge variant="outline" className="mb-2 text-[10px]">{item.category}</Badge>
-                                    <CardTitle className="text-lg">{item.name}</CardTitle>
+                                    <div className="flex gap-2 mb-2">
+                                        <Badge variant="outline" className="text-[10px]">{item.category}</Badge>
+                                        <Badge variant="secondary" className="text-[10px] opacity-70">
+                                            {formatStoreId(item.store_location)}
+                                        </Badge>
+                                    </div>
+                                    <CardTitle className="text-lg line-clamp-1">{item.name}</CardTitle>
                                 </div>
+                                {isManagement && <InventoryActions item={item} />}
                             </div>
                         </CardHeader>
                         <CardContent>

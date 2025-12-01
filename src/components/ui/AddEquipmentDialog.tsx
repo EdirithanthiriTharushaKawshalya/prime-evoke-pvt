@@ -22,13 +22,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus } from "lucide-react";
+import { Plus, Upload, Loader2, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { addRentalEquipment } from "@/lib/actions";
+import { supabase } from "@/lib/supabaseClient";
 
 export function AddEquipmentDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
 
   const [formData, setFormData] = useState({
@@ -37,21 +39,52 @@ export function AddEquipmentDialog() {
     description: "",
     daily_rate: "",
     quantity_total: "",
-    image_url: "",
+    store_location: "colombo", // Default
   });
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      let publicUrl = null;
+
+      // 1. Upload Image if exists
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('equipment-images')
+          .upload(filePath, imageFile);
+
+        if (uploadError) {
+          throw new Error("Image upload failed: " + uploadError.message);
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('equipment-images')
+          .getPublicUrl(filePath);
+
+        publicUrl = urlData.publicUrl;
+      }
+
+      // 2. Save Record
       const result = await addRentalEquipment({
         name: formData.name,
         category: formData.category,
         description: formData.description,
         daily_rate: parseFloat(formData.daily_rate),
         quantity_total: parseInt(formData.quantity_total),
-        image_url: formData.image_url || null,
+        image_url: publicUrl,
+        store_location: formData.store_location, // Ensure this exists in your DB schema or add to types
       });
 
       if (result.error) {
@@ -65,12 +98,13 @@ export function AddEquipmentDialog() {
           description: "",
           daily_rate: "",
           quantity_total: "",
-          image_url: "",
+          store_location: "colombo",
         });
+        setImageFile(null);
         router.refresh();
       }
-    } catch {
-      toast.error("An unexpected error occurred");
+    } catch (error: any) {
+      toast.error(error.message || "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
@@ -99,24 +133,40 @@ export function AddEquipmentDialog() {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Category</Label>
-            <Select
-              value={formData.category}
-              onValueChange={(val) => setFormData({ ...formData, category: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Camera">Camera</SelectItem>
-                <SelectItem value="Lens">Lens</SelectItem>
-                <SelectItem value="Lighting">Lighting</SelectItem>
-                <SelectItem value="Audio">Audio</SelectItem>
-                <SelectItem value="Support">Support (Tripods/Gimbals)</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select
+                value={formData.category}
+                onValueChange={(val) => setFormData({ ...formData, category: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Camera">Camera</SelectItem>
+                  <SelectItem value="Lens">Lens</SelectItem>
+                  <SelectItem value="Lighting">Lighting</SelectItem>
+                  <SelectItem value="Audio">Audio</SelectItem>
+                  <SelectItem value="Support">Support</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Store Location</Label>
+              <Select
+                value={formData.store_location}
+                onValueChange={(val) => setFormData({ ...formData, store_location: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="colombo">Colombo</SelectItem>
+                  <SelectItem value="ambalangoda">Ambalangoda</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -127,7 +177,6 @@ export function AddEquipmentDialog() {
                 step="0.01"
                 value={formData.daily_rate}
                 onChange={(e) => setFormData({ ...formData, daily_rate: e.target.value })}
-                placeholder="0.00"
                 required
               />
             </div>
@@ -137,9 +186,21 @@ export function AddEquipmentDialog() {
                 type="number"
                 value={formData.quantity_total}
                 onChange={(e) => setFormData({ ...formData, quantity_total: e.target.value })}
-                placeholder="1"
                 required
               />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Equipment Image</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="cursor-pointer"
+              />
+              {imageFile ? <div className="text-green-500"><Upload className="h-4 w-4"/></div> : <ImageIcon className="h-4 w-4 text-muted-foreground"/>}
             </div>
           </div>
 
@@ -154,7 +215,7 @@ export function AddEquipmentDialog() {
 
           <DialogFooter>
             <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Add to Fleet"}
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Saving...</> : "Add to Fleet"}
             </Button>
           </DialogFooter>
         </form>

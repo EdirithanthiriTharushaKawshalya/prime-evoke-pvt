@@ -12,9 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, ShoppingCart, Plus, Minus, ArrowLeft } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, ArrowLeft, Camera } from "lucide-react";
 import { RentalEquipment } from "@/lib/types";
 import { RentalCheckoutSheet } from "@/components/rentals/RentalCheckoutSheet";
+import Image from "next/image"; // Add this
 
 export default function StoreRentalsPage() {
   const params = useParams();
@@ -144,23 +145,46 @@ export default function StoreRentalsPage() {
                   {filteredEquipment
                     .filter((item) => cat === "All" || item.category === cat)
                     .map((item) => (
-                      <Card key={item.id} className={`flex flex-col border-white/10 bg-card/40 backdrop-blur-sm transition-all duration-300 ${cart[item.id] ? 'border-primary/50 shadow-[0_0_15px_rgba(37,99,235,0.1)]' : ''}`}>
+                      <Card key={item.id} className={`flex flex-col border-white/10 bg-card/40 backdrop-blur-sm transition-all duration-300 overflow-hidden ${cart[item.id] ? 'border-primary/50 shadow-[0_0_15px_rgba(37,99,235,0.1)]' : ''}`}>
+                        
+                        {/* --- NEW: Image Section --- */}
+                        <div className="relative w-full h-48 bg-black/20">
+                          {item.image_url ? (
+                            <Image 
+                              src={item.image_url} 
+                              alt={item.name} 
+                              fill 
+                              className="object-cover transition-transform hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-muted-foreground">
+                              <Camera className="h-12 w-12 opacity-20" />
+                            </div>
+                          )}
+                          <div className="absolute top-2 left-2">
+                              <Badge variant="secondary" className="text-[10px] uppercase tracking-wider backdrop-blur-md bg-black/50 text-white border-white/10">
+                                  {item.category}
+                              </Badge>
+                          </div>
+                        </div>
+
                         <CardHeader className="p-4 pb-2">
                           <div className="flex justify-between items-start">
-                            <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{item.category}</Badge>
                             <span className="font-mono text-xs text-muted-foreground">{item.quantity_total} in stock</span>
                           </div>
-                          <CardTitle className="text-lg mt-2 line-clamp-1">{item.name}</CardTitle>
+                          <CardTitle className="text-lg mt-1 line-clamp-1">{item.name}</CardTitle>
                         </CardHeader>
+                        
                         <CardContent className="p-4 pt-2 flex-1">
-                          <p className="text-sm text-muted-foreground line-clamp-3 h-[60px]">
-                            {item.description || "Professional grade equipment available for daily rental."}
+                          <p className="text-sm text-muted-foreground line-clamp-2 h-[40px]">
+                            {item.description || "Professional grade equipment."}
                           </p>
                           <div className="mt-4 flex items-baseline gap-1">
                             <span className="text-2xl font-bold text-primary">Rs. {item.daily_rate.toLocaleString()}</span>
                             <span className="text-xs text-muted-foreground">/ day</span>
                           </div>
                         </CardContent>
+                        
                         <CardFooter className="p-4 pt-0">
                           {cart[item.id] ? (
                             <div className="flex items-center justify-between w-full bg-primary/10 rounded-lg p-1">
@@ -216,6 +240,7 @@ export default function StoreRentalsPage() {
         cart={cart}
         equipment={equipment}
         setCart={setCart}
+        storeId={storeId}
       />
       
       <Footer />

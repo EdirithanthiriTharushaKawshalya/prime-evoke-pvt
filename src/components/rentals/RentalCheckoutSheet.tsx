@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Calendar, Trash2, Upload, FileText, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { submitRentalBooking } from "@/lib/actions";
-import { supabase } from "@/lib/supabaseClient"; 
+import { supabase } from "@/lib/supabaseClient";
 
 interface RentalCheckoutSheetProps {
   isOpen: boolean;
@@ -20,9 +20,17 @@ interface RentalCheckoutSheetProps {
   cart: { [id: number]: number };
   equipment: RentalEquipment[];
   setCart: (cart: { [id: number]: number }) => void;
+  storeId: string; // <--- 1. ADD THIS
 }
 
-export function RentalCheckoutSheet({ isOpen, onClose, cart, equipment, setCart }: RentalCheckoutSheetProps) {
+export function RentalCheckoutSheet({ 
+  isOpen, 
+  onClose, 
+  cart, 
+  equipment, 
+  setCart, 
+  storeId // <--- 2. DESTRUCTURE THIS
+}: RentalCheckoutSheetProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [idFrontFile, setIdFrontFile] = useState<File | null>(null);
@@ -131,7 +139,7 @@ export function RentalCheckoutSheet({ isOpen, onClose, cart, equipment, setCart 
         clientPhone: formData.client_phone,
         startDate: new Date(formData.start_date),
         endDate: new Date(formData.end_date),
-        storeId: "colombo", 
+        storeId: storeId, // <--- 3. USE DYNAMIC VARIABLE HERE (Remove "colombo")
         items: orderItems,
         totalCost: estimatedGrandTotal,
         clientAddress: fullAddress,

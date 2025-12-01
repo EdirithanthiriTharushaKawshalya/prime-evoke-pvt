@@ -1971,3 +1971,59 @@ export async function updateRentalVerificationStatus(bookingId: string, status: 
   return { success: true };
 }
 
+// --- NEW: Delete Rental Booking ---
+export async function deleteRentalBooking(bookingId: number) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Auth Check
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  const { error } = await supabase.from('rental_bookings').delete().eq('id', bookingId);
+  
+  if (error) return { error: error.message };
+  revalidatePath('/admin/rentals');
+  return { success: true };
+}
+
+// --- NEW: Update Rental Booking Details ---
+export async function updateRentalBooking(
+  bookingId: number, 
+  data: {
+    client_name?: string;
+    client_email?: string;
+    client_phone?: string;
+    status?: string;
+  }
+) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Auth Check
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  const { error } = await supabase
+    .from('rental_bookings')
+    .update(data)
+    .eq('id', bookingId);
+
+  if (error) return { error: error.message };
+  revalidatePath('/admin/rentals');
+  return { success: true };
+}

@@ -225,12 +225,13 @@ export type RentalEquipment = {
   id: number;
   created_at: string;
   name: string;
-  category: string; // 'Camera', 'Lens', 'Lighting', 'Audio', 'Support'
+  category: string; 
   description: string | null;
   daily_rate: number;
   quantity_total: number;
   image_url: string | null;
   is_active: boolean;
+  store_location: string; // <--- ADD THIS LINE
 };
 
 export type RentalBooking = {
@@ -246,8 +247,8 @@ export type RentalBooking = {
   total_amount: number;
   notes: string | null;
   items?: RentalOrderItem[]; 
-  // ADD THIS LINE:
   verification_status?: 'pending' | 'verified' | 'rejected';
+  store_id: string; 
 };
 
 export type RentalOrderItem = {
