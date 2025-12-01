@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RentalEquipment } from "@/lib/types";
 import { Separator } from "@/components/ui/separator";
 import { 
-  Calendar, Trash2, Upload, FileText, ArrowLeft, ArrowRight, 
+  Calendar, Trash2, Upload, ArrowLeft, ArrowRight, 
   Loader2, CheckCircle2, MapPin, ShieldCheck, ImageIcon, CreditCard 
 } from "lucide-react";
 import { toast } from "sonner";
@@ -323,7 +323,7 @@ export function RentalCheckoutSheet({
     </div>
   );
 
-  const FileUploader = ({ label, file, setFile }: { label: string, file: File | null, setFile: any }) => (
+  const FileUploader = ({ label, file, setFile }: { label: string, file: File | null, setFile: React.Dispatch<React.SetStateAction<File | null>> }) => (
     <div className="space-y-2">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <div className={cn(

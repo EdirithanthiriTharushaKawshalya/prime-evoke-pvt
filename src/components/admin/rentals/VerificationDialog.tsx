@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getRentalVerificationDetails, updateRentalVerificationStatus } from "@/lib/actions";
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 interface VerificationDialogProps {
@@ -22,10 +21,19 @@ interface VerificationDialogProps {
   clientName: string;
 }
 
+// Define specific type for verification details
+interface VerificationDetails {
+  address: string;
+  idFrontUrl: string;
+  idBackUrl: string;
+  selfieUrl: string;
+}
+
 export default function VerificationDialog({ bookingId, clientName }: VerificationDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [details, setDetails] = useState<any>(null);
+  // Fixed: Replaced 'any' with VerificationDetails | null
+  const [details, setDetails] = useState<VerificationDetails | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -40,7 +48,8 @@ export default function VerificationDialog({ bookingId, clientName }: Verificati
     try {
       const data = await getRentalVerificationDetails(bookingId.toString()); 
       setDetails(data);
-    } catch (error) {
+    } catch {
+      // Fixed: Removed unused 'error' variable
       toast.error("Could not load verification details.");
       setOpen(false);
     } finally {
@@ -56,7 +65,8 @@ export default function VerificationDialog({ bookingId, clientName }: Verificati
         toast.success(status === 'verified' ? "Client verified successfully" : "Verification rejected");
         setOpen(false);
       }
-    } catch (e) {
+    } catch {
+      // Fixed: Removed unused 'e' variable
       toast.error("Failed to update status");
     } finally {
       setIsProcessing(false);

@@ -121,8 +121,10 @@ export function AddEquipmentDialog() {
         removeImage();
         router.refresh();
       }
-    } catch (error: any) {
-      toast.error(error.message || "An unexpected error occurred");
+    } catch (error) {
+      // Fixed: Properly check error type instead of using 'any'
+      const message = error instanceof Error ? error.message : "An unexpected error occurred";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,6 @@ export function AddEquipmentDialog() {
         </Button>
       </DialogTrigger>
       
-      {/* Changed bg-zinc-950 back to bg-background (default theme color) */}
       <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto p-0 gap-0 bg-background border-white/10">
         <DialogHeader className="p-6 border-b border-white/10 bg-muted/20">
           <div className="flex items-center gap-3">
