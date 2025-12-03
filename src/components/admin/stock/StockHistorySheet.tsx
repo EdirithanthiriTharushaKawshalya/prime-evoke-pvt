@@ -9,7 +9,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { History, ArrowUpRight, ArrowDownLeft, Plus, User } from "lucide-react";
+import { History, User } from "lucide-react"; // Removed unused imports
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -30,7 +30,8 @@ type Movement = {
   };
 };
 
-export function StockHistorySheet({ movements }: { movements: any[] }) {
+// Fixed: Use 'Movement[]' instead of 'any[]'
+export function StockHistorySheet({ movements }: { movements: Movement[] }) {
   return (
     <Sheet>
       <SheetTrigger asChild>
