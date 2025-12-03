@@ -15,7 +15,8 @@ import { AddStockDialog } from "@/components/ui/AddStockDialog";
 import { RestockDialog } from "@/components/ui/RestockDialog";
 import { EditStockDialog } from "@/components/ui/EditStockDialog";
 import { Badge } from "@/components/ui/badge";
-import { StockHistorySheet } from "@/components/admin/stock/StockHistorySheet"; // <--- IMPORT THIS
+import { StockHistorySheet } from "@/components/admin/stock/StockHistorySheet";
+import { RecordWasteDialog } from "@/components/ui/RecordWasteDialog"; // <--- Import this
 
 export default async function StockPage() {
   const cookieStore = await cookies();
@@ -142,8 +143,9 @@ export default async function StockPage() {
           
           {/* --- ACTION BUTTONS --- */}
           {isManagement && (
-            <div className="flex gap-2">
-               <StockHistorySheet movements={movements || []} /> {/* <--- NEW HISTORY BUTTON */}
+            <div className="flex flex-wrap gap-2">
+               <RecordWasteDialog inventory={inventory} /> {/* <--- NEW BUTTON */}
+               <StockHistorySheet movements={movements || []} />
                <AddStockDialog />
             </div>
           )}

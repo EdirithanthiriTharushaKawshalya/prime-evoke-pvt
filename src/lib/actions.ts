@@ -2090,3 +2090,62 @@ export async function updateRentalBooking(
   revalidatePath('/admin/rentals');
   return { success: true };
 }
+
+// --- NEW: Record Waste / Spoilage ---
+export async function recordWasteItem(
+  itemId: number, 
+  quantity: number, 
+  reason: string
+) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // 1. Auth Check
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+  
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  
+  // Note: Even normal staff might need to record waste, but let's keep it restricted for now if you prefer
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  // 2. Get current stock
+  const { data: currentItem } = await supabase
+    .from('inventory_stock')
+    .select('quantity')
+    .eq('id', itemId)
+    .single();
+
+  if (!currentItem) return { error: "Item not found" };
+
+  // 3. Calculate new quantity
+  const newQuantity = currentItem.quantity - quantity;
+
+  // 4. Update Stock
+  const { error: updateError } = await supabase
+    .from('inventory_stock')
+    .update({ quantity: newQuantity, last_updated: new Date().toISOString() })
+    .eq('id', itemId);
+
+  if (updateError) return { error: updateError.message };
+
+  // 5. Record Movement (Type: 'Waste')
+  const { error: moveError } = await supabase.from('inventory_movements').insert({
+    stock_item_id: itemId,
+    type: 'Waste', // <--- Distinct type for filtering later
+    quantity_change: -quantity, // Negative number
+    previous_quantity: currentItem.quantity,
+    new_quantity: newQuantity,
+    notes: reason, // e.g., "Printer Jam"
+    user_id: session.user.id
+  });
+
+  if (moveError) return { error: moveError.message };
+
+  revalidatePath('/admin/stock');
+  return { success: true };
+}
