@@ -515,11 +515,6 @@ export async function updatePhotographerFinancialDetails(
           staff_name: detail.staff_name,
           amount: detail.amount
         })));
-
-      if (insertError) {
-        console.error("Error inserting photographer details:", insertError);
-        return { error: insertError.message };
-      }
     }
 
     // Revalidate the path to refresh data
@@ -1653,15 +1648,34 @@ export async function addStockItem(data: {
     { cookies: { get: (name) => cookieStore.get(name)?.value } }
   );
 
-  // Auth Check (Management Only) - reusing logic from previous answers
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { error: "Not authenticated" };
+  
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
   if (profile?.role !== 'management') return { error: "Permission denied." };
 
-  const { error } = await supabase.from('inventory_stock').insert([data]);
+  // Insert Item
+  const { data: newItem, error } = await supabase
+    .from('inventory_stock')
+    .insert([data])
+    .select()
+    .single();
   
   if (error) return { error: error.message };
+
+  // Record Initial Movement
+  if (newItem) {
+    await supabase.from('inventory_movements').insert({
+      stock_item_id: newItem.id,
+      type: 'Initial',
+      quantity_change: data.quantity,
+      previous_quantity: 0,
+      new_quantity: data.quantity,
+      notes: 'Item Created',
+      user_id: session.user.id // <--- ADDED THIS
+    });
+  }
+
   revalidatePath('/admin/stock');
   return { success: true };
 }
@@ -1678,6 +1692,7 @@ export async function restockItem(id: number, amountToAdd: number, currentQty: n
   // Auth Check
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { error: "Not authenticated" };
+  
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
   if (profile?.role !== 'management') return { error: "Permission denied." };
 
@@ -1691,14 +1706,15 @@ export async function restockItem(id: number, amountToAdd: number, currentQty: n
 
   if (error) return { error: error.message };
 
-  // Record Movement
+  // Record Movement WITH USER ID
   await supabase.from('inventory_movements').insert({
     stock_item_id: id,
     type: 'Restock',
     quantity_change: amountToAdd,
     previous_quantity: currentQty,
     new_quantity: newQuantity,
-    notes: 'Manual Restock'
+    notes: 'Manual Restock',
+    user_id: session.user.id // <--- ADDED THIS
   });
 
   revalidatePath('/admin/stock');

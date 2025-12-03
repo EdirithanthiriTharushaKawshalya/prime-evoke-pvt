@@ -8,13 +8,14 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, AlertTriangle, Droplet, Layers, Frame, Sparkles } from "lucide-react"; // Added Sparkles for Lamination
+import { ArrowLeft, AlertTriangle, Droplet, Layers, Frame, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { StockItem, Profile } from "@/lib/types";
 import { AddStockDialog } from "@/components/ui/AddStockDialog";
 import { RestockDialog } from "@/components/ui/RestockDialog";
 import { EditStockDialog } from "@/components/ui/EditStockDialog";
 import { Badge } from "@/components/ui/badge";
+import { StockHistorySheet } from "@/components/admin/stock/StockHistorySheet"; // <--- IMPORT THIS
 
 export default async function StockPage() {
   const cookieStore = await cookies();
@@ -37,6 +38,7 @@ export default async function StockPage() {
   const userRole = (profileData as Profile)?.role || 'staff';
   const isManagement = userRole === 'management';
 
+  // 1. Fetch Current Stock
   const { data: stock } = await supabase
     .from("inventory_stock")
     .select("*")
@@ -44,11 +46,23 @@ export default async function StockPage() {
 
   const inventory = (stock as StockItem[]) || [];
 
-  // --- UPDATED CATEGORIES ---
+  // 2. NEW: Fetch History Log (Movements)
+  // We join with inventory_stock to get item names, and profiles to get admin names
+  const { data: movements } = await supabase
+    .from("inventory_movements")
+    .select(`
+      *,
+      stock_item:inventory_stock(item_name, category),
+      user:profiles(full_name)
+    `)
+    .order("created_at", { ascending: false })
+    .limit(50); // Limit to last 50 actions to keep it fast
+
+  // --- Filtering Categories (Keep existing) ---
   const frames = inventory.filter(i => i.category.toLowerCase().includes('frame'));
   const papers = inventory.filter(i => i.category.toLowerCase().includes('paper'));
   const inks = inventory.filter(i => i.category.toLowerCase().includes('ink'));
-  const laminations = inventory.filter(i => i.category.toLowerCase().includes('lamination')); // New Category
+  const laminations = inventory.filter(i => i.category.toLowerCase().includes('lamination'));
   const others = inventory.filter(i => 
     !frames.includes(i) && 
     !papers.includes(i) && 
@@ -125,13 +139,20 @@ export default async function StockPage() {
               <p className="text-sm text-muted-foreground">Manage frames, papers, inks, and lamination</p>
             </div>
           </div>
-          {isManagement && <AddStockDialog />}
+          
+          {/* --- ACTION BUTTONS --- */}
+          {isManagement && (
+            <div className="flex gap-2">
+               <StockHistorySheet movements={movements || []} /> {/* <--- NEW HISTORY BUTTON */}
+               <AddStockDialog />
+            </div>
+          )}
         </div>
 
         <StockSection title="Frames" items={frames} icon={Frame} />
         <StockSection title="Printing Papers" items={papers} icon={Layers} />
         <StockSection title="Ink Bottles" items={inks} icon={Droplet} />
-        <StockSection title="Lamination" items={laminations} icon={Sparkles} /> {/* New Section */}
+        <StockSection title="Lamination" items={laminations} icon={Sparkles} />
         {others.length > 0 && <StockSection title="Other Items" items={others} icon={Layers} />}
 
       </div>
