@@ -1098,13 +1098,17 @@ export async function submitProductOrder(formData: {
 
         if (orderError) throw orderError;
 
-        // 2. PROCESS STOCK REDUCTION (Updated Logic)
+        // 2. PROCESS STOCK REDUCTION (Updated Logic for Albums)
         
         for (const item of formData.ordered_items) {
             const sizeToSearch = item.size; // e.g., "12x18" or "A4"
             
             // Determine which categories to reduce based on item type
             const categoriesToReduce: string[] = [];
+            
+            // Logic specific variables
+            let searchKeyword = sizeToSearch; 
+            let qtyToReduce = item.quantity;
 
             if (item.type === 'print') {
                 // Buying a Print -> Reduce Paper
@@ -1113,21 +1117,45 @@ export async function submitProductOrder(formData: {
                 // Buying a Frame -> Reduce Frame AND Reduce Paper
                 categoriesToReduce.push('Frame');
                 categoriesToReduce.push('Paper');
+            } else if (item.type === 'album') {
+                // Buying an Album -> Reduce Paper (Double Side Card)
+                categoriesToReduce.push('Paper');
+                
+                // SPECIAL LOGIC FOR ALBUMS:
+                // 1. We specifically look for "Double Side" paper
+                searchKeyword = "Double Side"; 
+                
+                // 2. Calculate sheets needed: 
+                // (Page Count / 2) because it's double-sided * Quantity of albums
+                const pages = item.page_count || 0;
+                const sheetsPerAlbum = Math.ceil(pages / 2); 
+                qtyToReduce = item.quantity * sheetsPerAlbum;
             }
 
             // Execute reduction for each required category
             for (const category of categoriesToReduce) {
-                // Find stock item that matches Category AND contains the Size in its name
-                const { data: stockItems } = await supabase
+                
+                // Build the query
+                let query = supabase
                     .from('inventory_stock')
                     .select('*')
-                    .eq('category', category)
-                    .ilike('item_name', `%${sizeToSearch}%`) // Case-insensitive match for size
-                    .limit(1);
+                    .eq('category', category);
+
+                if (item.type === 'album') {
+                    // For albums, look for "Double Side" AND the size (e.g. "A4")
+                    query = query
+                        .ilike('item_name', `%${searchKeyword}%`)
+                        .ilike('item_name', `%${item.size}%`);
+                } else {
+                    // For prints/frames, just look for the size in the name
+                    query = query.ilike('item_name', `%${searchKeyword}%`);
+                }
+
+                const { data: stockItems } = await query.limit(1);
 
                 if (stockItems && stockItems.length > 0) {
                     const stockItem = stockItems[0];
-                    const qtyToReduce = item.quantity;
+                    
                     const newQuantity = stockItem.quantity - qtyToReduce;
 
                     // Perform update
