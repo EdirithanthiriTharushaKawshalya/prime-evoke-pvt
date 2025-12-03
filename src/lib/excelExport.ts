@@ -1,11 +1,16 @@
 // lib/excelExport.ts - Full updated file
-import { Booking, ServicePackage, TeamMember, ProductOrder } from './types';
+import { 
+  Booking, ServicePackage, TeamMember, ProductOrder, 
+  RentalBooking, FinancialRecord // <--- Import these
+} from './types';
 
 export interface MonthlyReportData {
   bookings: Booking[];
   packages: ServicePackage[];
   teamMembers: TeamMember[];
   productOrders: ProductOrder[];
+  rentalBookings: RentalBooking[]; // <--- New
+  financialRecords: FinancialRecord[]; // <--- New
   month: string;
   year: string;
 }
@@ -35,7 +40,7 @@ interface FinancialStats {
 }
 
 export async function generateMonthlyExcelReport(data: MonthlyReportData): Promise<Blob> {
-  const { bookings, packages, month, year, productOrders } = data;
+  const { bookings, packages, month, year, productOrders, rentalBookings, financialRecords } = data;
   
   // Calculate analytics
   const packageStats = calculatePackageStats(bookings, packages);
@@ -61,6 +66,18 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
     XLSX.utils.aoa_to_sheet(generateProductFinancialsSheet(productOrders)), 
     'Product Financials'
   );
+  
+  // --- NEW SHEETS ---
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet(generateRentalBookingsSheet(rentalBookings)), 
+    'Rental Bookings' // <--- New Sheet
+  );
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet(generateFinancialRecordsSheet(financialRecords)), 
+    'General Ledger' // <--- New Sheet
+  );
+  // ------------------
+  
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generatePackageAnalyticsSheet(packageStats)), 
     'Package Analytics'
@@ -85,12 +102,10 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
     XLSX.utils.aoa_to_sheet(generatePhotographerEarningsSheet(bookings)), 
     'Photographer Earnings'
   );
-  // --- ADD THIS LINE ---
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateSalarySheet(bookings, productOrders)), 
     'Salary Sheet'
   );
-  // --- END OF ADDITION ---
 
   // Convert to Excel blob
   const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
@@ -582,6 +597,86 @@ function generateProductFinancialsSheet(productOrders: ProductOrder[]): (string 
       `Rs. ${totalProfit.toLocaleString()}`,
       '', '', '', ''
     ]
+  );
+
+  return [headers, ...data];
+}
+
+// --- NEW: Generate Rental Bookings Sheet ---
+function generateRentalBookingsSheet(rentals: RentalBooking[]): (string | number)[][] {
+  const headers = [
+    'Booking Ref', 'Store Location', 'Client Name', 'Email', 'Phone',
+    'Start Date', 'End Date', 'Status', 'Verification',
+    'Items Rented', 'Total Amount', 'Created At'
+  ];
+
+  if (!rentals || rentals.length === 0) {
+    return [['Rental Bookings'], [''], ['No rental bookings found for this period.']];
+  }
+
+  const data = rentals.map(r => {
+    // Format Items list
+    const itemsList = r.items?.map(i => 
+      `${i.quantity}x ${i.equipment_name} (${i.days_rented} days)`
+    ).join(', ') || 'No items';
+
+    return [
+      r.booking_id,
+      r.store_id ? r.store_id.charAt(0).toUpperCase() + r.store_id.slice(1) : 'Unknown',
+      r.client_name,
+      r.client_email,
+      r.client_phone,
+      new Date(r.start_date).toLocaleDateString(),
+      new Date(r.end_date).toLocaleDateString(),
+      r.status,
+      r.verification_status || 'Pending',
+      itemsList,
+      `Rs. ${r.total_amount.toLocaleString()}`,
+      new Date(r.created_at).toLocaleDateString()
+    ];
+  });
+
+  // Calculate Total
+  const totalRevenue = rentals.reduce((sum, r) => sum + r.total_amount, 0);
+  data.push(
+    [''],
+    ['SUMMARY', '', '', '', '', '', '', '', '', '', `Rs. ${totalRevenue.toLocaleString()}`, '']
+  );
+
+  return [headers, ...data];
+}
+
+// --- NEW: Generate Financial Records Sheet ---
+function generateFinancialRecordsSheet(records: FinancialRecord[]): (string | number)[][] {
+  const headers = [
+    'Date', 'Description', 'Type', 'Category', 
+    'Payment Method', 'Income Amount', 'Expense Amount'
+  ];
+
+  if (!records || records.length === 0) {
+    return [['General Ledger'], [''], ['No financial records found for this period.']];
+  }
+
+  const data = records.map(r => [
+    new Date(r.date).toLocaleDateString(),
+    r.description,
+    r.type,
+    r.category,
+    r.payment_method || 'N/A',
+    r.type === 'Income' ? `Rs. ${r.amount.toLocaleString()}` : '',
+    r.type === 'Expense' ? `Rs. ${r.amount.toLocaleString()}` : '',
+  ]);
+
+  // Calculate Totals
+  const totalIncome = records.filter(r => r.type === 'Income').reduce((sum, r) => sum + r.amount, 0);
+  const totalExpense = records.filter(r => r.type === 'Expense').reduce((sum, r) => sum + r.amount, 0);
+  const net = totalIncome - totalExpense;
+
+  data.push(
+    [''],
+    ['TOTALS', '', '', '', '', `Rs. ${totalIncome.toLocaleString()}`, `Rs. ${totalExpense.toLocaleString()}`],
+    [''],
+    ['NET CASH FLOW', '', '', '', '', '', `Rs. ${net.toLocaleString()}`]
   );
 
   return [headers, ...data];

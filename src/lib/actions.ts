@@ -10,10 +10,11 @@ import {
   OrderedItem, 
   ProductOrder,
   ProductOrderPhotographerCommission,
-  FinancialRecord 
+  FinancialRecord,
+  RentalBooking,
+  RentalEquipment
 } from '@/lib/types';
-import { RentalEquipment } from '@/lib/types';
-import { RentalBooking, RentalOrderItem } from '@/lib/types';
+import { RentalOrderItem } from '@/lib/types';
 
 // --- generateMonthlyReport function ---
 export async function generateMonthlyReport(month: string, year: string) {
@@ -71,6 +72,22 @@ export async function generateMonthlyReport(month: string, year: string) {
       
     if (ordersError) throw ordersError;
 
+    // --- NEW: Fetch Rental Bookings ---
+    const { data: rentalBookings } = await supabase
+      .from('rental_bookings')
+      .select('*, items:rental_order_items(*)') // Fetch related items
+      .gte('created_at', startDate)
+      .lte('created_at', endDate)
+      .order('created_at', { ascending: true });
+
+    // --- NEW: Fetch Financial Records ---
+    const { data: financialRecords } = await supabase
+      .from('other_financial_records')
+      .select('*')
+      .gte('date', startDate.split('T')[0])
+      .lte('date', endDate.split('T')[0])
+      .order('date', { ascending: true });
+
     const { data: packages, error: packagesError } = await supabase
       .from('services')
       .select('*');
@@ -109,7 +126,7 @@ export async function generateMonthlyReport(month: string, year: string) {
       }
     }
 
-    // --- NEW: Process Product Orders with Financials ---
+    // --- Process Product Orders with Financials ---
     let productOrdersWithFinancial: ProductOrder[] = [];
     if (productOrders && productOrders.length > 0) {
       const orderIds = productOrders.map(o => o.id);
@@ -145,7 +162,9 @@ export async function generateMonthlyReport(month: string, year: string) {
       bookings: bookingsWithFinancial || [],
       packages: packages || [],
       teamMembers: teamMembers || [],
-      productOrders: productOrdersWithFinancial || [], // Pass ENHANCED product orders
+      productOrders: productOrdersWithFinancial || [],
+      rentalBookings: (rentalBookings as RentalBooking[]) || [], // Pass Rentals
+      financialRecords: (financialRecords as FinancialRecord[]) || [], // Pass Financials
       month,
       year
     });
@@ -832,7 +851,7 @@ export async function getPhotographerMonthlyEarnings(month: string, year: string
   }
 }
 
-// --- NEW: updateProductOrderAssignments function ---
+// --- updateProductOrderAssignments function ---
 export async function updateProductOrderAssignments(
   orderId: number,
   newAssignments: string[]
@@ -882,7 +901,7 @@ export async function updateProductOrderAssignments(
   return { success: true };
 }
 
-// --- NEW: updateProductOrderFinancialEntry function ---
+// --- updateProductOrderFinancialEntry function ---
 export async function updateProductOrderFinancialEntry(
   orderId: number,
   financialData: {
@@ -950,7 +969,7 @@ export async function updateProductOrderFinancialEntry(
   }
 }
 
-// --- NEW: updateProductOrderPhotographerCommission function ---
+// --- updateProductOrderPhotographerCommission function ---
 export async function updateProductOrderPhotographerCommission(
   orderId: number,
   photographerDetails: ProductOrderPhotographerCommission[]
@@ -1313,7 +1332,7 @@ export async function getProductOrderFinancialEntries(orderIds: number[]) {
   return { financialEntries };
 }
 
-// --- NEW: updateProductOrder function ---
+// --- updateProductOrder function ---
 export async function updateProductOrder(
   orderId: number,
   updates: {
@@ -1374,7 +1393,7 @@ export async function updateProductOrder(
   return { success: true };
 }
 
-// --- NEW: generateMySalaryReport function ---
+// --- generateMySalaryReport function ---
 export async function generateMySalaryReport(month: string, year: string) {
   const cookieStore = await cookies();
 
@@ -1971,7 +1990,7 @@ export async function updateRentalVerificationStatus(bookingId: string, status: 
   return { success: true };
 }
 
-// --- NEW: Delete Rental Booking ---
+// --- Delete Rental Booking ---
 export async function deleteRentalBooking(bookingId: number) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -1994,7 +2013,7 @@ export async function deleteRentalBooking(bookingId: number) {
   return { success: true };
 }
 
-// --- NEW: Update Rental Booking Details ---
+// --- Update Rental Booking Details ---
 export async function updateRentalBooking(
   bookingId: number, 
   data: {

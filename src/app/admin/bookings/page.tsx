@@ -3,8 +3,6 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BookingCard } from "@/components/ui/BookingCard";
-import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
-import { MySalaryDownloadButton } from "@/components/ui/MySalaryDownloadButton";
 import {
   Booking,
   Profile,
@@ -90,7 +88,6 @@ export default async function AdminBookingsPage() {
   if (profileError || !profile) console.error("Error fetching profile:", profileError);
 
   const userRole = profile?.role ?? "staff";
-  // Removed userName as it is no longer used here
 
   let packages: ServicePackage[] = [];
   const { data: packagesData } = await supabase.from("services").select("*");
@@ -207,14 +204,8 @@ export default async function AdminBookingsPage() {
               </div>
             </div>
             
-            {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2 md:gap-4">
-              <ReportDownloadButton userRole={userRole} />
-              <MySalaryDownloadButton />
-            </div>
+            {/* Action Buttons REMOVED */}
           </div>
-
-          {/* REMOVED: "Viewing as" paragraph */}
 
           {fetchError && (
             <p className="text-destructive text-sm mb-4">Error loading data: {fetchError}</p>
@@ -222,7 +213,6 @@ export default async function AdminBookingsPage() {
 
           {/* --- Tabbed Interface --- */}
           <Tabs defaultValue="bookings" className="w-full">
-            {/* ... (tabs content remains the same) ... */}
             <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-6 md:mb-8 rounded-full h-12">
               <TabsTrigger value="bookings" className="rounded-full text-xs md:text-sm">
                 Client Bookings
