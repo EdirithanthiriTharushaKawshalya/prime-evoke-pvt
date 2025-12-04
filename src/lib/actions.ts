@@ -2208,3 +2208,131 @@ export async function updateBookingEditor(
   revalidatePath('/admin/bookings');
   return { success: true };
 }
+
+// --- NEW: Get Analytics Data ---
+export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+
+  // 1. Calculate Date Range
+  const now = new Date();
+  let startDate = new Date();
+  
+  if (timeRange === '3m') startDate.setMonth(now.getMonth() - 3);
+  else if (timeRange === '6m') startDate.setMonth(now.getMonth() - 6);
+  else if (timeRange === '1y') startDate.setFullYear(now.getFullYear() - 1);
+  else startDate = new Date(0); // Beginning of time
+
+  const startIso = startDate.toISOString();
+
+  // 2. Fetch Data
+  
+  // FIX: Joined financial_entries to get the amount correctly
+  // Note: We use !inner to ensure we only get bookings, but left join is safer here to count bookings even without financials
+  const { data: bookings } = await supabase
+    .from('client_bookings')
+    .select(`
+      id, 
+      event_date, 
+      assigned_photographers, 
+      assigned_editor, 
+      event_type,
+      financial_entry:financial_entries(package_amount, final_amount) 
+    `)
+    .gte('event_date', startIso)
+    .neq('status', 'Cancelled');
+
+  const { data: rentals } = await supabase
+    .from('rental_bookings')
+    .select('id, start_date, total_amount')
+    .gte('start_date', startIso)
+    .neq('status', 'Cancelled');
+
+  const { data: orders } = await supabase
+    .from('product_orders')
+    .select('id, created_at, total_amount')
+    .gte('created_at', startIso)
+    .neq('status', 'Cancelled');
+
+  // 3. Aggregate Monthly Revenue & Counts
+  const monthlyData: Record<string, any> = {};
+
+  const processEntry = (dateStr: string, type: 'bookings' | 'rentals' | 'orders', amount: number) => {
+    if (!dateStr) return;
+    const date = new Date(dateStr);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // "2025-01"
+    
+    if (!monthlyData[key]) {
+      monthlyData[key] = { 
+        name: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }), 
+        fullDate: key,
+        bookings: 0, rentals: 0, orders: 0, 
+        revenue: 0 
+      };
+    }
+    monthlyData[key][type] += 1;
+    monthlyData[key].revenue += amount || 0;
+  };
+
+  // Process Bookings with proper financial mapping
+  bookings?.forEach((b: any) => {
+    // Prefer final_amount, fallback to package_amount, fallback to 0
+    const revenue = b.financial_entry?.final_amount || b.financial_entry?.package_amount || 0;
+    processEntry(b.event_date, 'bookings', revenue);
+  });
+
+  rentals?.forEach(r => processEntry(r.start_date, 'rentals', r.total_amount || 0));
+  orders?.forEach(o => processEntry(o.created_at, 'orders', o.total_amount || 0));
+
+  // Convert to array and sort by date
+  const chartData = Object.values(monthlyData).sort((a: any, b: any) => a.fullDate.localeCompare(b.fullDate));
+
+  // 4. Aggregate Staff Performance
+  const staffStats: Record<string, { name: string, events: number, edits: number }> = {};
+
+  bookings?.forEach((b: any) => {
+    // Count Photographers
+    if (Array.isArray(b.assigned_photographers)) {
+        b.assigned_photographers.forEach((name: string) => {
+            if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0 };
+            staffStats[name].events += 1;
+        });
+    }
+    // Count Editor
+    if (b.assigned_editor) {
+      const name = b.assigned_editor;
+      if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0 };
+      staffStats[name].edits += 1;
+    }
+  });
+
+  const staffPerformance = Object.values(staffStats).sort((a, b) => (b.events + b.edits) - (a.events + a.edits));
+
+  // 5. Category Distribution
+  const categoryStats: Record<string, number> = {};
+  bookings?.forEach((b: any) => {
+    const type = b.event_type || 'Other';
+    categoryStats[type] = (categoryStats[type] || 0) + 1;
+  });
+  
+  const categoryData = Object.entries(categoryStats).map(([name, value]) => ({ name, value }));
+
+  return {
+    chartData,
+    staffPerformance,
+    categoryData,
+    totals: {
+      bookings: bookings?.length || 0,
+      rentals: rentals?.length || 0,
+      orders: orders?.length || 0,
+      revenue: chartData.reduce((sum, item) => sum + item.revenue, 0)
+    }
+  };
+}

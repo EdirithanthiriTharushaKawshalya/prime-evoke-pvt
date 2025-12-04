@@ -6,7 +6,7 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CalendarDays, DollarSign, Package, ArrowRight, Camera } from "lucide-react";
+import { CalendarDays, DollarSign, Package, ArrowRight, Camera, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
@@ -88,6 +88,15 @@ export default async function AdminHub() {
       color: "text-amber-500",
       bgColor: "bg-amber-500/10",
       restricted: false,
+    },
+    {
+      title: "Analytics & Progress",
+      description: "Visual charts for revenue, events, and staff performance.",
+      icon: TrendingUp,
+      href: "/admin/analytics",
+      color: "text-cyan-500",
+      bgColor: "bg-cyan-500/10",
+      restricted: true,
     },
   ];
 
