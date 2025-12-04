@@ -40,7 +40,7 @@ import {
   LucideIcon,
   ChevronRight,
   X,
-  Menu,
+  // Menu removed here (Fix for Line 43)
   Smartphone,
 } from "lucide-react";
 import { getAnalyticsData } from "@/lib/actions";
@@ -109,6 +109,30 @@ interface TooltipProps {
   label?: string;
 }
 
+// New Interface for Pie Chart Tooltip (Fix for Line 145)
+interface PieChartTooltipProps {
+  active?: boolean;
+  payload?: {
+    color: string;
+    payload: {
+      name: string;
+      value: number;
+      percent?: number;
+    };
+  }[];
+}
+
+// New Interface for Active Shape (Fix for Line 645)
+interface PieActiveShapeProps {
+  cx: number;
+  cy: number;
+  innerRadius: number;
+  outerRadius: number;
+  startAngle: number;
+  endAngle: number;
+  fill: string;
+}
+
 // Custom Tooltip Component
 const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   if (active && payload && payload.length) {
@@ -142,7 +166,7 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
 };
 
 // Custom Pie Chart Tooltip
-const PieChartTooltip = ({ active, payload }: any) => {
+const PieChartTooltip = ({ active, payload }: PieChartTooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -186,10 +210,10 @@ const PieChartTooltip = ({ active, payload }: any) => {
 };
 
 // View All Categories Modal Component
-const ViewAllCategoriesModal = ({ 
-  categories, 
-  onClose 
-}: { 
+const ViewAllCategoriesModal = ({
+  categories,
+  onClose,
+}: {
   categories: Array<{
     name: string;
     value: number;
@@ -204,7 +228,9 @@ const ViewAllCategoriesModal = ({
       <div className="bg-zinc-950 border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
         <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/10">
           <div>
-            <h3 className="text-lg md:text-xl font-bold text-white">All Event Categories</h3>
+            <h3 className="text-lg md:text-xl font-bold text-white">
+              All Event Categories
+            </h3>
             <p className="text-xs md:text-sm text-zinc-400 mt-1">
               Detailed breakdown of all photography event types
             </p>
@@ -216,7 +242,7 @@ const ViewAllCategoriesModal = ({
             <X className="h-4 w-4 md:h-5 md:w-5 text-zinc-400" />
           </button>
         </div>
-        
+
         <div className="p-4 md:p-6 overflow-y-auto max-h-[60vh]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             {categories.map((category) => (
@@ -231,7 +257,9 @@ const ViewAllCategoriesModal = ({
                       style={{ backgroundColor: category.color }}
                     />
                     <div className="max-w-[120px] md:max-w-none">
-                      <h4 className="font-bold text-white text-sm md:text-base truncate">{category.name}</h4>
+                      <h4 className="font-bold text-white text-sm md:text-base truncate">
+                        {category.name}
+                      </h4>
                       <span className="text-xs text-zinc-500">
                         Rank #{category.rank}
                       </span>
@@ -244,7 +272,7 @@ const ViewAllCategoriesModal = ({
                     <div className="text-xs text-zinc-400">events</div>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs md:text-sm">
                     <span className="text-zinc-400">Share</span>
@@ -266,7 +294,7 @@ const ViewAllCategoriesModal = ({
                     <span>100%</span>
                   </div>
                 </div>
-                
+
                 <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-white/10">
                   <div className="grid grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm">
                     <div className="text-center p-1 md:p-2 bg-white/5 rounded">
@@ -286,31 +314,42 @@ const ViewAllCategoriesModal = ({
               </div>
             ))}
           </div>
-          
+
           <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="text-center min-w-[100px]">
-                <div className="text-xs md:text-sm text-zinc-400">Total Categories</div>
+                <div className="text-xs md:text-sm text-zinc-400">
+                  Total Categories
+                </div>
                 <div className="text-xl md:text-2xl font-bold text-white">
                   {categories.length}
                 </div>
               </div>
               <div className="text-center min-w-[100px]">
-                <div className="text-xs md:text-sm text-zinc-400">Total Events</div>
+                <div className="text-xs md:text-sm text-zinc-400">
+                  Total Events
+                </div>
                 <div className="text-xl md:text-2xl font-bold text-white">
-                  {categories.reduce((sum, cat) => sum + cat.value, 0).toLocaleString()}
+                  {categories
+                    .reduce((sum, cat) => sum + cat.value, 0)
+                    .toLocaleString()}
                 </div>
               </div>
               <div className="text-center min-w-[100px]">
-                <div className="text-xs md:text-sm text-zinc-400">Avg per Category</div>
+                <div className="text-xs md:text-sm text-zinc-400">
+                  Avg per Category
+                </div>
                 <div className="text-xl md:text-2xl font-bold text-white">
-                  {Math.round(categories.reduce((sum, cat) => sum + cat.value, 0) / categories.length)}
+                  {Math.round(
+                    categories.reduce((sum, cat) => sum + cat.value, 0) /
+                      categories.length
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </div>
-        
+
         <div className="p-4 md:p-6 border-t border-white/10">
           <button
             onClick={onClose}
@@ -339,11 +378,11 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   useEffect(() => {
@@ -487,7 +526,10 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
           </TabsList>
 
           {/* --- TAB 1: COMPANY GROWTH --- */}
-          <TabsContent value="overview" className="space-y-4 md:space-y-6 mt-4 md:mt-6">
+          <TabsContent
+            value="overview"
+            className="space-y-4 md:space-y-6 mt-4 md:mt-6"
+          >
             <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-7">
               {/* Main Bar Chart - Full width on mobile, 4 cols on desktop */}
               <Card className="col-span-1 lg:col-span-4 bg-zinc-900/50 border-white/5 backdrop-blur-sm shadow-xl">
@@ -502,10 +544,14 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                 <CardContent className="p-2 md:p-6 md:pl-2">
                   <div className="h-[250px] md:h-[350px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart 
-                        data={data.chartData} 
+                      <BarChart
+                        data={data.chartData}
                         barGap={isMobile ? 2 : 4}
-                        margin={isMobile ? { top: 5, right: 5, left: 5, bottom: 5 } : undefined}
+                        margin={
+                          isMobile
+                            ? { top: 5, right: 5, left: 5, bottom: 5 }
+                            : undefined
+                        }
                       >
                         <defs>
                           <linearGradient
@@ -572,7 +618,10 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                         {!isMobile && (
                           <Legend
                             iconType="circle"
-                            wrapperStyle={{ paddingTop: "20px", fontSize: "12px" }}
+                            wrapperStyle={{
+                              paddingTop: "20px",
+                              fontSize: "12px",
+                            }}
                           />
                         )}
                         <Bar
@@ -623,9 +672,17 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 md:p-6">
-                  <div className={`flex ${isMobile ? 'flex-col' : 'flex-col lg:flex-row'} gap-4 md:gap-6`}>
+                  <div
+                    className={`flex ${
+                      isMobile ? "flex-col" : "flex-col lg:flex-row"
+                    } gap-4 md:gap-6`}
+                  >
                     {/* Pie Chart Container */}
-                    <div className={`${isMobile ? 'w-full' : 'lg:w-1/2'} h-[200px] md:h-[250px] relative`}>
+                    <div
+                      className={`${
+                        isMobile ? "w-full" : "lg:w-1/2"
+                      } h-[200px] md:h-[250px] relative`}
+                    >
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -642,7 +699,9 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                               setActiveCategoryIndex(index)
                             }
                             onMouseLeave={() => setActiveCategoryIndex(null)}
-                            activeShape={(props: any) => {
+                            // FIX: Type props as 'unknown' first to satisfy the library's signature
+                            activeShape={(props: unknown) => {
+                              // FIX: Cast 'unknown' to your strict interface here
                               const {
                                 cx,
                                 cy,
@@ -651,19 +710,18 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                                 startAngle,
                                 endAngle,
                                 fill,
-                              } = props;
+                              } = props as PieActiveShapeProps;
+
                               return (
                                 <g>
                                   <path
                                     d={`M ${cx} ${cy}
-              L ${cx + outerRadius * Math.cos((-startAngle * Math.PI) / 180)} ${
+L ${cx + outerRadius * Math.cos((-startAngle * Math.PI) / 180)} ${
                                       cy +
                                       outerRadius *
                                         Math.sin((-startAngle * Math.PI) / 180)
                                     }
-              A ${outerRadius} ${outerRadius} 0 ${
-                                      endAngle - startAngle > 180 ? 1 : 0
-                                    } 0 ${
+A ${outerRadius} ${outerRadius} 0 ${endAngle - startAngle > 180 ? 1 : 0} 0 ${
                                       cx +
                                       outerRadius *
                                         Math.cos((-endAngle * Math.PI) / 180)
@@ -672,21 +730,19 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                                       outerRadius *
                                         Math.sin((-endAngle * Math.PI) / 180)
                                     }
-              L ${cx} ${cy}`}
+L ${cx} ${cy}`}
                                     fill={fill}
                                     stroke="rgba(255,255,255,0.3)"
                                     strokeWidth={2}
                                   />
                                   <path
                                     d={`M ${cx} ${cy}
-              L ${cx + innerRadius * Math.cos((-startAngle * Math.PI) / 180)} ${
+L ${cx + innerRadius * Math.cos((-startAngle * Math.PI) / 180)} ${
                                       cy +
                                       innerRadius *
                                         Math.sin((-startAngle * Math.PI) / 180)
                                     }
-              A ${innerRadius} ${innerRadius} 0 ${
-                                      endAngle - startAngle > 180 ? 1 : 0
-                                    } 0 ${
+A ${innerRadius} ${innerRadius} 0 ${endAngle - startAngle > 180 ? 1 : 0} 0 ${
                                       cx +
                                       innerRadius *
                                         Math.cos((-endAngle * Math.PI) / 180)
@@ -695,7 +751,7 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                                       innerRadius *
                                         Math.sin((-endAngle * Math.PI) / 180)
                                     }
-              L ${cx} ${cy}`}
+L ${cx} ${cy}`}
                                     fill="rgba(0,0,0,0.2)"
                                     stroke="rgba(255,255,255,0.1)"
                                     strokeWidth={1}
@@ -747,7 +803,7 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                     </div>
 
                     {/* Legend/Details Panel */}
-                    <div className={isMobile ? 'w-full' : 'lg:w-1/2'}>
+                    <div className={isMobile ? "w-full" : "lg:w-1/2"}>
                       <div className="mb-4">
                         <h3 className="text-xs md:text-sm font-semibold text-zinc-400 mb-2 md:mb-3">
                           Top Categories
@@ -789,7 +845,8 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                                     {category.value}
                                   </p>
                                   <p className="text-[10px] md:text-xs text-zinc-500">
-                                    {((category.percent || 0) * 100).toFixed(1)}%
+                                    {((category.percent || 0) * 100).toFixed(1)}
+                                    %
                                   </p>
                                 </div>
                               </div>
@@ -802,7 +859,9 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                                   <div
                                     className="h-full rounded-full transition-all duration-300"
                                     style={{
-                                      width: `${(category.percent || 0) * 100}%`,
+                                      width: `${
+                                        (category.percent || 0) * 100
+                                      }%`,
                                       backgroundColor: category.color,
                                     }}
                                   />
@@ -825,7 +884,9 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                             </div>
                           </div>
                           <div className="text-center p-1 md:p-2 bg-white/5 rounded-lg">
-                            <div className="text-[10px] md:text-xs text-zinc-400">Avg/Type</div>
+                            <div className="text-[10px] md:text-xs text-zinc-400">
+                              Avg/Type
+                            </div>
                             <div className="text-sm md:text-lg font-bold text-white">
                               {Math.round(
                                 data.totals.bookings / pieDataWithPercent.length
@@ -839,7 +900,7 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                           <span className="text-zinc-400 text-[10px] md:text-xs">
                             {otherCategories.length} more categories
                           </span>
-                          <button 
+                          <button
                             onClick={() => setShowAllCategories(true)}
                             className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors text-[10px] md:text-xs"
                           >
@@ -867,9 +928,13 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
               <CardContent className="p-2 md:p-6 md:pl-2">
                 <div className="h-[250px] md:h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart 
+                    <AreaChart
                       data={data.chartData}
-                      margin={isMobile ? { top: 5, right: 5, left: 5, bottom: 5 } : undefined}
+                      margin={
+                        isMobile
+                          ? { top: 5, right: 5, left: 5, bottom: 5 }
+                          : undefined
+                      }
                     >
                       <defs>
                         <linearGradient
@@ -952,9 +1017,10 @@ export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
                     <BarChart
                       data={data.staffPerformance}
                       layout="vertical"
-                      margin={isMobile ? 
-                        { left: -10, right: 10, bottom: 10, top: 10 } : 
-                        { left: 0, right: 30, bottom: 20 }
+                      margin={
+                        isMobile
+                          ? { left: -10, right: 10, bottom: 10, top: 10 }
+                          : { left: 0, right: 30, bottom: 20 }
                       }
                       barGap={2}
                     >
