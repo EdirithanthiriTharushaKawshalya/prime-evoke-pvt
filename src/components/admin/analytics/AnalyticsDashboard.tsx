@@ -88,7 +88,32 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   return null;
 };
 
-export default function AnalyticsDashboard() {
+// Custom Legend for Pie Chart - Updated UI
+const CustomPieLegend = (props: any) => {
+  const { payload } = props;
+  return (
+    <ul className="flex flex-col gap-3 justify-center h-full pl-4">
+      {payload.map((entry: any, index: number) => (
+        <li key={`item-${index}`} className="flex items-center justify-between text-sm w-full">
+          <div className="flex items-center gap-2">
+             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+             <span className="text-zinc-300 font-medium text-xs truncate max-w-[120px]" title={entry.value}>
+               {entry.payload.name}
+             </span>
+          </div>
+          <div className="flex items-center gap-3">
+             <span className="text-white font-bold text-xs">{entry.value}</span>
+             <span className="text-zinc-500 text-[10px] font-mono opacity-70 min-w-[30px] text-right">
+               {((entry.payload.percent || 0) * 100).toFixed(0)}%
+             </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+export default function AnalyticsDashboard({ userRole }: { userRole: string }) {
   const [range, setRange] = useState<'3m' | '6m' | '1y' | 'all'>('6m');
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,13 +171,15 @@ export default function AnalyticsDashboard() {
         </Select>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard title="Total Revenue" value={`Rs. ${data.totals.revenue.toLocaleString()}`} icon={DollarSign} color="text-emerald-400" />
-        <SummaryCard title="Total Events" value={data.totals.bookings} icon={Camera} color="text-blue-400" />
-        <SummaryCard title="Rentals" value={data.totals.rentals} icon={TrendingUp} color="text-purple-400" />
-        <SummaryCard title="Product Orders" value={data.totals.orders} icon={Users} color="text-amber-400" />
-      </div>
+      {/* Summary Cards - ONLY VISIBLE TO MANAGEMENT */}
+      {userRole === 'management' && (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <SummaryCard title="Total Revenue" value={`Rs. ${data.totals.revenue.toLocaleString()}`} icon={DollarSign} color="text-emerald-400" />
+          <SummaryCard title="Total Events" value={data.totals.bookings} icon={Camera} color="text-blue-400" />
+          <SummaryCard title="Rentals" value={data.totals.rentals} icon={TrendingUp} color="text-purple-400" />
+          <SummaryCard title="Product Orders" value={data.totals.orders} icon={Users} color="text-amber-400" />
+        </div>
+      )}
 
       {/* Charts Section */}
       <Tabs defaultValue="overview" className="w-full">
@@ -200,106 +227,45 @@ export default function AnalyticsDashboard() {
               </CardContent>
             </Card>
 
-            {/* UPDATED PIE CHART - Event Distribution */}
-            <Card className="col-span-1 lg:col-span-3 bg-zinc-900/50 border-white/5 backdrop-blur-sm shadow-xl">
+            {/* UPDATED PIE CHART - Spans 3 cols */}
+            <Card className="col-span-1 lg:col-span-3 bg-zinc-900/50 border-white/5 backdrop-blur-sm shadow-xl flex flex-col">
               <CardHeader>
-                <CardTitle className="text-base md:text-lg">Event Distribution</CardTitle>
-                <CardDescription>Breakdown of photography categories</CardDescription>
+                <CardTitle className="text-base md:text-lg">Event Types</CardTitle>
+                <CardDescription>Distribution of photography categories</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-8">
-                  {/* Chart Container */}
-                  <div className="relative h-[200px] w-[200px] lg:h-[220px] lg:w-[220px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieDataWithPercent}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={85}
-                          paddingAngle={2}
-                          dataKey="value"
-                          stroke="#1f2937"
-                          strokeWidth={2}
-                        >
-                          {pieDataWithPercent.map((entry, index) => (
-                            <Cell 
-                              key={`cell-${index}`} 
-                              fill={COLORS[index % COLORS.length]}
-                              className="hover:opacity-80 transition-opacity"
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          content={<CustomTooltip />}
-                          formatter={(value: number) => [value, "Events"]}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    
-                    {/* Center Total */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-3xl font-bold text-white">{data.totals.bookings}</span>
-                      <span className="text-xs text-zinc-400 uppercase tracking-wider mt-1">Total Events</span>
-                    </div>
-                  </div>
-
-                  {/* Legend & Breakdown */}
-                  <div className="flex-1 min-w-0 w-full">
-                    <div className="space-y-3">
-                      {pieDataWithPercent.map((entry, index) => {
-                        const percentage = ((entry.percent || 0) * 100).toFixed(1);
-                        return (
-                          <div 
-                            key={`legend-${index}`} 
-                            className="flex items-center justify-between group hover:bg-white/5 p-2 rounded-lg transition-colors"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div 
-                                className="w-3 h-3 rounded-full flex-shrink-0" 
-                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                              />
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-white truncate" title={entry.name}>
-                                  {entry.name}
-                                </p>
-                                <p className="text-xs text-zinc-500 mt-0.5">
-                                  {percentage}% • {entry.value} events
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <div className="w-16 h-2 bg-white/10 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full rounded-full"
-                                  style={{ 
-                                    width: `${percentage}%`,
-                                    backgroundColor: COLORS[index % COLORS.length]
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Summary Stats */}
-                    <div className="mt-6 pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-zinc-500 uppercase tracking-wider">Most Popular</p>
-                        <p className="text-sm font-semibold text-white mt-1 truncate">
-                          {pieDataWithPercent[0]?.name || "N/A"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-zinc-500 uppercase tracking-wider">Top 3 Categories</p>
-                        <p className="text-sm font-semibold text-white mt-1">
-                          {pieDataWithPercent.slice(0, 3).reduce((sum, item) => sum + (item.percent || 0), 0).toFixed(1)}%
-                        </p>
-                      </div>
-                    </div>
+              <CardContent className="flex-1 min-h-[300px]">
+                <div className="h-full w-full flex items-center justify-center relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieDataWithPercent}
+                        cx="35%" // Shifted left to make room for legend
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {pieDataWithPercent.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        layout="vertical" 
+                        verticalAlign="middle" 
+                        align="right"
+                        content={<CustomPieLegend />}
+                        wrapperStyle={{ right: 0, top: '50%', transform: 'translateY(-50%)', width: '50%' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  
+                  {/* Center Text */}
+                  <div className="absolute left-[18%] top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                    <span className="text-3xl font-bold text-white block leading-none">{data.totals.bookings}</span>
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-medium">Total</span>
                   </div>
                 </div>
               </CardContent>

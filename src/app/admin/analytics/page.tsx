@@ -21,31 +21,38 @@ export default async function AnalyticsPage() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) redirect("/login");
 
-  // Basic Role Check
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-  if (profile?.role !== 'management') {
-    return <div className="p-10 text-center text-white">Access Denied. Management only.</div>;
-  }
+  // Fetch Profile to determine Role
+  // We explicitly ALLOW 'staff' here by not redirecting them.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+  
+  // Default to 'staff' if role is missing, but pass it to dashboard
+  const userRole = profile?.role || 'staff';
 
   return (
     <div className="relative min-h-screen flex flex-col">
       <AnimatedBackground />
       <Header />
-      <div className="container mx-auto py-6 px-4 md:py-10 flex-1">
+      <div className="container mx-auto py-4 px-4 md:py-10 flex-1">
         
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 md:mb-8">
           <Link href="/admin">
-            <Button variant="ghost" size="icon" className="shrink-0"><ArrowLeft className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" className="shrink-0 border border-white/5 bg-white/5 hover:bg-white/10">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
           </Link>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Analytics & Progress</h1>
+            <h1 className="text-xl md:text-3xl font-bold leading-tight">Analytics & Progress</h1>
             <p className="text-sm text-muted-foreground">Financial insights and team performance metrics</p>
           </div>
         </div>
 
-        {/* The Dashboard Component */}
-        <AnalyticsDashboard />
+        {/* Dashboard Component - Now handles its own internal visibility */}
+        <AnalyticsDashboard userRole={userRole} />
 
       </div>
       <Footer />

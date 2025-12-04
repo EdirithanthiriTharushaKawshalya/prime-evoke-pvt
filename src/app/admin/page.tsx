@@ -101,7 +101,7 @@ export default async function AdminHub() {
       href: "/admin/analytics",
       color: "text-cyan-500",
       bgColor: "bg-cyan-500/10",
-      restricted: true,
+      restricted: false, // <--- CHANGED FROM TRUE TO FALSE
     },
   ];
 
