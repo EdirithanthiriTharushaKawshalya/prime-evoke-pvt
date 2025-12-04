@@ -161,7 +161,7 @@ export function BookingCard({ booking, userRole, availableStaff, packages }: Boo
                   <DollarSign className="h-3 w-3 mr-1" /> Financial
                 </Button>
                 
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex gap-2 w-full sm:w-auto flex-wrap">
                     {/* Photographers */}
                     <AssignPhotographers
                       bookingId={booking.id}

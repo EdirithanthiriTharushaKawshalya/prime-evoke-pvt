@@ -6,12 +6,22 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CalendarDays, DollarSign, Package, ArrowRight, Camera, TrendingUp } from "lucide-react";
+import { 
+  CalendarDays, DollarSign, Package, ArrowRight, Camera, TrendingUp, MoreVertical 
+} from "lucide-react";
 import Link from "next/link";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
 import { MySalaryDownloadButton } from "@/components/ui/MySalaryDownloadButton";
 import { Profile } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 export default async function AdminHub() {
   const cookieStore = await cookies();
@@ -24,14 +34,9 @@ export default async function AdminHub() {
     }
   );
 
-  // --- FIX: Handle Auth Errors Gracefully ---
-  // We destructure 'error' to check if the token is invalid (e.g., Refresh Token Not Found)
+  // Auth Check
   const { data: { session }, error: authError } = await supabase.auth.getSession();
-
-  // If there's an error OR no session, redirect to login
-  if (authError || !session) {
-    redirect("/login");
-  }
+  if (authError || !session) redirect("/login");
 
   const { data: profileData } = await supabase
     .from("profiles")
@@ -111,28 +116,58 @@ export default async function AdminHub() {
       <div className="container mx-auto py-8 px-4 flex-1 flex flex-col">
         
         {/* --- Top Action Bar --- */}
-        <div className="flex flex-col sm:flex-row justify-end items-center gap-3 mb-6">
-          <MySalaryDownloadButton />
-          {userRole === 'management' && <ReportDownloadButton userRole={userRole} />}
-          <LogoutButton />
-        </div>
-
-        <div className="flex-1 flex flex-col justify-center">
-          <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold tracking-tight mb-2">Admin Overview</h1>
-            <p className="text-muted-foreground text-lg">Select a module to manage</p>
-            
-            <p className="mt-4 text-sm text-muted-foreground">
-              Viewing as: <span className="font-medium text-foreground">{userRole}</span> ({userName})
+        <div className="flex justify-between items-start mb-8">
+          
+          {/* Title Section */}
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">Admin Overview</h1>
+            <p className="text-muted-foreground text-sm md:text-base">
+              Viewing as: <span className="font-medium text-foreground">{userRole}</span>
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto w-full mb-12">
+          {/* ACTIONS: Desktop View (Flex Row) */}
+          <div className="hidden md:flex items-center gap-3">
+            <MySalaryDownloadButton />
+            {userRole === 'management' && <ReportDownloadButton userRole={userRole} />}
+            <LogoutButton />
+          </div>
+
+          {/* ACTIONS: Mobile View (Dropdown) */}
+          <div className="md:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="bg-white/5 border-white/10">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-zinc-950 border-white/10 p-2">
+                <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                
+                {/* We use a custom class trick here: [&_button]:w-full 
+                   This forces the imported buttons (which we can't easily edit) to stretch full width inside the dropdown.
+                */}
+                <div className="flex flex-col gap-2 [&_button]:w-full [&_button]:justify-start">
+                  <MySalaryDownloadButton />
+                  {userRole === 'management' && <ReportDownloadButton userRole={userRole} />}
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <LogoutButton />
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+        </div>
+
+        {/* --- Dashboard Grid --- */}
+        <div className="flex-1 flex flex-col justify-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto w-full mb-12">
             {menuItems.map((item) => (
               <Link key={item.title} href={item.href} className="group">
-                <Card className="h-full border-white/10 bg-card/50 backdrop-blur-sm hover:bg-card/80 transition-all duration-300 hover:border-white/20 hover:scale-[1.02]">
+                <Card className="h-full border-white/10 bg-card/50 backdrop-blur-sm hover:bg-card/80 transition-all duration-300 hover:border-white/20 hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/5">
                   <CardHeader>
-                    <div className={`w-12 h-12 rounded-lg ${item.bgColor} flex items-center justify-center mb-4`}>
+                    <div className={`w-12 h-12 rounded-lg ${item.bgColor} flex items-center justify-center mb-4 transition-transform group-hover:scale-110 duration-300`}>
                       <item.icon className={`h-6 w-6 ${item.color}`} />
                     </div>
                     <CardTitle className="text-xl group-hover:text-primary transition-colors">
@@ -140,11 +175,11 @@ export default async function AdminHub() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-base mb-6">
+                    <CardDescription className="text-sm md:text-base mb-6 line-clamp-2">
                       {item.description}
                     </CardDescription>
                     <div className="flex items-center text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                      Access Module <ArrowRight className="ml-2 h-4 w-4" />
+                      Access Module <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </CardContent>
                 </Card>

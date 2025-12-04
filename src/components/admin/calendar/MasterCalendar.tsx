@@ -57,7 +57,7 @@ type CalendarEvent = {
   type: 'booking' | 'rental' | 'order';
 };
 
-// --- CUSTOM TOOLBAR COMPONENT ---
+// --- RESPONSIVE TOOLBAR COMPONENT ---
 const CustomToolbar = (toolbar: ToolbarProps<CalendarEvent, object>) => {
   const goToBack = () => { toolbar.onNavigate('PREV'); };
   const goToNext = () => { toolbar.onNavigate('NEXT'); };
@@ -67,68 +67,57 @@ const CustomToolbar = (toolbar: ToolbarProps<CalendarEvent, object>) => {
   const label = () => {
     const date = moment(toolbar.date);
     return (
-      <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+      <span className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
         {date.format('MMMM YYYY')}
       </span>
     );
   };
 
   return (
-    <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 p-2 bg-white/5 rounded-xl border border-white/10 backdrop-blur-md">
-      {/* Left: Navigation */}
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={goToCurrent} className="border-white/10 hover:bg-white/10">
-          Today
-        </Button>
-        <div className="flex items-center bg-black/20 rounded-lg p-1 border border-white/5">
-          <Button variant="ghost" size="icon" onClick={goToBack} className="h-8 w-8 hover:bg-white/10">
-            <ChevronLeft className="h-4 w-4" />
+    <div className="flex flex-col xl:flex-row items-center justify-between mb-4 md:mb-6 gap-4 p-2 bg-white/5 rounded-xl border border-white/10 backdrop-blur-md">
+      
+      {/* Top Row on Mobile: Navigation */}
+      <div className="flex w-full xl:w-auto items-center justify-between xl:justify-start gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={goToCurrent} className="border-white/10 hover:bg-white/10 text-xs md:text-sm h-8 md:h-9">
+            Today
           </Button>
-          <Button variant="ghost" size="icon" onClick={goToNext} className="h-8 w-8 hover:bg-white/10">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center bg-black/20 rounded-lg p-1 border border-white/5">
+            <Button variant="ghost" size="icon" onClick={goToBack} className="h-7 w-7 md:h-8 md:w-8 hover:bg-white/10">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={goToNext} className="h-7 w-7 md:h-8 md:w-8 hover:bg-white/10">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        
+        {/* Label (Mobile: Right aligned in top row, Desktop: Center) */}
+        <div className="xl:hidden">
+          {label()}
         </div>
       </div>
 
-      {/* Center: Label */}
-      <div className="flex-1 text-center">
+      {/* Center Label (Desktop Only) */}
+      <div className="hidden xl:block flex-1 text-center">
         {label()}
       </div>
 
-      {/* Right: View Switcher */}
-      <div className="flex items-center bg-black/20 rounded-lg p-1 border border-white/5">
-        <Button 
-          variant={toolbar.view === 'month' ? 'secondary' : 'ghost'} 
-          size="sm" 
-          onClick={() => handleViewChange('month')} 
-          className={toolbar.view === 'month' ? "text-xs bg-white/10" : "text-xs"}
-        >
-          <CalendarDays className="mr-2 h-3 w-3" /> Month
-        </Button>
-        <Button 
-          variant={toolbar.view === 'week' ? 'secondary' : 'ghost'} 
-          size="sm" 
-          onClick={() => handleViewChange('week')} 
-          className={toolbar.view === 'week' ? "text-xs bg-white/10" : "text-xs"}
-        >
-          Week
-        </Button>
-        <Button 
-          variant={toolbar.view === 'day' ? 'secondary' : 'ghost'} 
-          size="sm" 
-          onClick={() => handleViewChange('day')} 
-          className={toolbar.view === 'day' ? "text-xs bg-white/10" : "text-xs"}
-        >
-          Day
-        </Button>
-        <Button 
-          variant={toolbar.view === 'agenda' ? 'secondary' : 'ghost'} 
-          size="sm" 
-          onClick={() => handleViewChange('agenda')} 
-          className={toolbar.view === 'agenda' ? "text-xs bg-white/10" : "text-xs"}
-        >
-          <List className="mr-2 h-3 w-3" /> Agenda
-        </Button>
+      {/* View Switcher (Full width on mobile) */}
+      <div className="flex w-full xl:w-auto items-center justify-center bg-black/20 rounded-lg p-1 border border-white/5 overflow-x-auto">
+        {['month', 'week', 'day', 'agenda'].map((v) => (
+          <Button 
+            key={v}
+            variant={toolbar.view === v ? 'secondary' : 'ghost'} 
+            size="sm" 
+            onClick={() => handleViewChange(v as View)} 
+            className={`text-xs flex-1 xl:flex-none ${toolbar.view === v ? "bg-white/10" : ""}`}
+          >
+            {v === 'month' && <CalendarDays className="mr-1.5 h-3 w-3" />}
+            {v === 'agenda' && <List className="mr-1.5 h-3 w-3" />}
+            <span className="capitalize">{v}</span>
+          </Button>
+        ))}
       </div>
     </div>
   );
@@ -197,22 +186,23 @@ export default function MasterCalendar({ data }: { data: CalendarData }) {
     const newStyle = {
       backgroundColor: '#2563eb', // blue-600
       color: 'white',
-      borderRadius: '6px',
+      borderRadius: '4px',
       border: 'none',
-      borderLeft: '4px solid #1d4ed8', // blue-700
+      borderLeft: '3px solid #1d4ed8', // blue-700
       display: 'block',
-      fontSize: '0.85rem',
+      fontSize: '0.75rem', // Slightly smaller text for mobile
       fontWeight: '500',
-      padding: '2px 6px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      padding: '1px 4px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      marginBottom: '1px'
     };
 
     if (event.type === 'rental') {
       newStyle.backgroundColor = '#7c3aed'; // purple-600
-      newStyle.borderLeft = '4px solid #5b21b6'; // purple-800
+      newStyle.borderLeft = '3px solid #5b21b6'; // purple-800
     } else if (event.type === 'order') {
       newStyle.backgroundColor = '#d97706'; // amber-600
-      newStyle.borderLeft = '4px solid #92400e'; // amber-800
+      newStyle.borderLeft = '3px solid #92400e'; // amber-800
     }
 
     return {
@@ -224,7 +214,6 @@ export default function MasterCalendar({ data }: { data: CalendarData }) {
   const handleViewChange = (newView: View) => setView(newView);
 
   // Helper type guards for the dialog
-  // Fix: Check against 'unknown' first
   const isBooking = (r: unknown): r is BookingResource => 
     typeof r === 'object' && r !== null && 'inquiry_id' in r;
   
@@ -235,7 +224,8 @@ export default function MasterCalendar({ data }: { data: CalendarData }) {
     typeof r === 'object' && r !== null && 'order_id' in r;
 
   return (
-    <div className="h-[800px] bg-zinc-950/50 backdrop-blur-sm p-6 rounded-2xl border border-white/10 shadow-2xl">
+    // UPDATED CONTAINER: Responsive Height (h-[600px] mobile -> h-[800px] desktop) and Padding (p-3 -> p-6)
+    <div className="h-[600px] md:h-[800px] bg-zinc-950/50 backdrop-blur-sm p-3 md:p-6 rounded-2xl border border-white/10 shadow-2xl flex flex-col">
       <Calendar
         localizer={localizer}
         events={events}
@@ -253,18 +243,18 @@ export default function MasterCalendar({ data }: { data: CalendarData }) {
         onSelectEvent={(event) => setSelectedEvent(event)}
         views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
         popup
-        className="text-gray-200 font-sans"
+        className="text-gray-200 font-sans text-xs md:text-sm" // Scale font size
       />
 
       {/* --- Event Details Dialog --- */}
       <Dialog open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
-        <DialogContent className="bg-zinc-950 border-white/10 sm:max-w-md">
+        <DialogContent className="bg-zinc-950 border-white/10 sm:max-w-md w-[95vw] rounded-xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
+            <DialogTitle className="flex items-center gap-2 text-lg md:text-xl">
               {selectedEvent?.type === 'booking' && <Camera className="text-blue-500 h-5 w-5" />}
               {selectedEvent?.type === 'rental' && <CalendarIcon className="text-purple-500 h-5 w-5" />}
               {selectedEvent?.type === 'order' && <ShoppingBag className="text-amber-500 h-5 w-5" />}
-              {selectedEvent?.title}
+              <span className="truncate">{selectedEvent?.title}</span>
             </DialogTitle>
             <DialogDescription>
               {selectedEvent?.type === 'booking' && "Photography Session Details"}
@@ -287,7 +277,7 @@ export default function MasterCalendar({ data }: { data: CalendarData }) {
 
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
-                  <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="flex flex-col">
@@ -300,7 +290,7 @@ export default function MasterCalendar({ data }: { data: CalendarData }) {
                 </div>
                 
                 <div className="flex items-center gap-3 text-sm">
-                  <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="flex flex-col">
@@ -314,7 +304,7 @@ export default function MasterCalendar({ data }: { data: CalendarData }) {
                 </div>
 
                 <div className="pt-2">
-                  <div className="bg-black/30 rounded-md p-2 text-xs font-mono text-muted-foreground text-center border border-white/5 select-all">
+                  <div className="bg-black/30 rounded-md p-2 text-xs font-mono text-muted-foreground text-center border border-white/5 select-all break-all">
                     ID: {
                       (isBooking(selectedEvent.resource) && selectedEvent.resource.inquiry_id) || 
                       (isRental(selectedEvent.resource) && selectedEvent.resource.booking_id) || 
