@@ -6,7 +6,7 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { getCalendarData } from "@/lib/actions";
 import MasterCalendar from "@/components/admin/calendar/MasterCalendar";
@@ -23,7 +23,34 @@ export default async function CalendarPage() {
   if (!session) redirect("/login");
 
   // Fetch all aggregated data
-  const calendarData = await getCalendarData();
+  const result = await getCalendarData();
+
+  // Handle potential errors
+  if ('error' in result) {
+    return (
+      <div className="relative min-h-screen flex flex-col items-center justify-center">
+        <AnimatedBackground />
+        <Header />
+        <div className="text-center space-y-4">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+          <h2 className="text-2xl font-bold">Access Denied or Error</h2>
+          <p className="text-muted-foreground">{result.error}</p>
+          <Link href="/admin">
+            <Button>Return to Dashboard</Button>
+          </Link>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // If no error, we know result matches the CalendarData shape
+  // We can explicitly cast it or just pass it as it now matches the happy path
+  const calendarData = {
+    bookings: result.bookings,
+    rentals: result.rentals,
+    orders: result.orders
+  };
 
   return (
     <div className="relative min-h-screen flex flex-col">
