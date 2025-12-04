@@ -1466,7 +1466,6 @@ export async function generateMySalaryReport(month: string, year: string) {
       .lte('order.created_at', endDate);
 
     // 3. --- NEW: Editing Earnings ---
-    // Type casting for the raw editing response
     interface RawEditingEntry {
         editor_expenses: number;
         booking: {
@@ -1512,9 +1511,10 @@ export async function generateMySalaryReport(month: string, year: string) {
       fileName: `Salary-${userName}-${month}-${year}.xlsx` 
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "An unexpected error occurred";
     console.error("Error generating salary report:", error);
-    return { error: error.message };
+    return { error: message };
   }
 }
 
@@ -2252,8 +2252,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
 
   // 2. Fetch Data
   
-  // FIX: Joined financial_entries to get the amount correctly
-  // Note: We use !inner to ensure we only get bookings, but left join is safer here to count bookings even without financials
+  // FIX: Typed the response for better type safety
   const { data: bookings } = await supabase
     .from('client_bookings')
     .select(`
@@ -2318,7 +2317,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
   (orders as DatabaseOrder[])?.forEach(o => processEntry(o.created_at, 'orders', o.total_amount || 0));
 
   // Convert to array and sort by date
-  const chartData = Object.values(monthlyData).sort((a: any, b: any) => a.fullDate.localeCompare(b.fullDate));
+  const chartData = Object.values(monthlyData).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
 
   // 4. Aggregate Staff Performance
   const staffStats: Record<string, { name: string, events: number, edits: number }> = {};

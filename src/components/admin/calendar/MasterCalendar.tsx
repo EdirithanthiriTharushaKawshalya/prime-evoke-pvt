@@ -224,9 +224,15 @@ export default function MasterCalendar({ data }: { data: CalendarData }) {
   const handleViewChange = (newView: View) => setView(newView);
 
   // Helper type guards for the dialog
-  const isBooking = (r: any): r is BookingResource => 'inquiry_id' in r;
-  const isRental = (r: any): r is RentalResource => 'booking_id' in r;
-  const isOrder = (r: any): r is OrderResource => 'order_id' in r;
+  // Fix: Check against 'unknown' first
+  const isBooking = (r: unknown): r is BookingResource => 
+    typeof r === 'object' && r !== null && 'inquiry_id' in r;
+  
+  const isRental = (r: unknown): r is RentalResource => 
+    typeof r === 'object' && r !== null && 'booking_id' in r;
+  
+  const isOrder = (r: unknown): r is OrderResource => 
+    typeof r === 'object' && r !== null && 'order_id' in r;
 
   return (
     <div className="h-[800px] bg-zinc-950/50 backdrop-blur-sm p-6 rounded-2xl border border-white/10 shadow-2xl">
