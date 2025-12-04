@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { CalendarDays, DollarSign, Package, ArrowRight, Camera } from "lucide-react";
 import Link from "next/link";
 import { LogoutButton } from "@/components/ui/LogoutButton";
-import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton"; // <--- Import
-import { MySalaryDownloadButton } from "@/components/ui/MySalaryDownloadButton"; // <--- Import
+import { ReportDownloadButton } from "@/components/ui/ReportDownloadButton";
+import { MySalaryDownloadButton } from "@/components/ui/MySalaryDownloadButton";
 import { Profile } from "@/lib/types";
 
 export default async function AdminHub() {
@@ -24,8 +24,14 @@ export default async function AdminHub() {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect("/login");
+  // --- FIX: Handle Auth Errors Gracefully ---
+  // We destructure 'error' to check if the token is invalid (e.g., Refresh Token Not Found)
+  const { data: { session }, error: authError } = await supabase.auth.getSession();
+
+  // If there's an error OR no session, redirect to login
+  if (authError || !session) {
+    redirect("/login");
+  }
 
   const { data: profileData } = await supabase
     .from("profiles")
@@ -54,6 +60,15 @@ export default async function AdminHub() {
       href: "/admin/rentals",
       color: "text-purple-500",
       bgColor: "bg-purple-500/10",
+      restricted: false,
+    },
+    {
+      title: "Master Calendar",
+      description: "View all events, rentals, and orders in one timeline.",
+      icon: CalendarDays,
+      href: "/admin/calendar",
+      color: "text-pink-500",
+      bgColor: "bg-pink-500/10",
       restricted: false,
     },
     {

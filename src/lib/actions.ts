@@ -2149,3 +2149,40 @@ export async function recordWasteItem(
   revalidatePath('/admin/stock');
   return { success: true };
 }
+
+// --- NEW: Get Calendar Data ---
+export async function getCalendarData() {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+
+  // 1. Fetch Bookings (Photography Sessions)
+  const { data: bookings } = await supabase
+    .from('client_bookings')
+    .select('id, full_name, event_type, event_date, status, inquiry_id')
+    .neq('status', 'Cancelled');
+
+  // 2. Fetch Rentals (Equipment Duration)
+  const { data: rentals } = await supabase
+    .from('rental_bookings')
+    .select('id, client_name, start_date, end_date, status, booking_id')
+    .neq('status', 'Cancelled');
+
+  // 3. Fetch Product Orders (Using Created Date as the "Order Date")
+  const { data: orders } = await supabase
+    .from('product_orders')
+    .select('id, customer_name, created_at, status, order_id')
+    .neq('status', 'Cancelled');
+
+  return { 
+    bookings: bookings || [], 
+    rentals: rentals || [], 
+    orders: orders || [] 
+  };
+}
