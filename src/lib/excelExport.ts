@@ -1,16 +1,18 @@
 // lib/excelExport.ts - Full updated file
 import { 
   Booking, ServicePackage, TeamMember, ProductOrder, 
-  RentalBooking, FinancialRecord // <--- Import these
+  RentalBooking, FinancialRecord // Ensure these are imported
 } from './types';
 
+// --- THIS IS THE FIX ---
 export interface MonthlyReportData {
   bookings: Booking[];
   packages: ServicePackage[];
   teamMembers: TeamMember[];
   productOrders: ProductOrder[];
-  rentalBookings: RentalBooking[]; // <--- New
-  financialRecords: FinancialRecord[]; // <--- New
+  // Add these two lines to fix the "Object literal..." error in actions.ts
+  rentalBookings: RentalBooking[]; 
+  financialRecords: FinancialRecord[];
   month: string;
   year: string;
 }

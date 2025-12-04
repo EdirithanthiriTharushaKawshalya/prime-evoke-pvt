@@ -11,22 +11,54 @@ import {
   Camera, Calendar as CalendarIcon, ShoppingBag, MapPin, Clock, 
   ChevronLeft, ChevronRight, CalendarDays, List 
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 // Setup the localizer
 const localizer = momentLocalizer(moment);
+
+// --- Types ---
+interface BookingResource {
+  id: number;
+  full_name: string;
+  event_date: string;
+  event_type: string;
+  status: string;
+  inquiry_id: string;
+}
+
+interface RentalResource {
+  id: number;
+  client_name: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  booking_id: string;
+}
+
+interface OrderResource {
+  id: number;
+  customer_name: string;
+  created_at: string;
+  status: string;
+  order_id: string;
+}
+
+interface CalendarData {
+  bookings: BookingResource[];
+  rentals: RentalResource[];
+  orders: OrderResource[];
+}
 
 type CalendarEvent = {
   id: string | number;
   title: string;
   start: Date;
   end: Date;
-  resource: any;
+  resource: BookingResource | RentalResource | OrderResource;
   type: 'booking' | 'rental' | 'order';
 };
 
 // --- CUSTOM TOOLBAR COMPONENT ---
-const CustomToolbar: React.FC<ToolbarProps<CalendarEvent, object>> = (toolbar) => {
+const CustomToolbar = (toolbar: ToolbarProps<CalendarEvent, object>) => {
   const goToBack = () => { toolbar.onNavigate('PREV'); };
   const goToNext = () => { toolbar.onNavigate('NEXT'); };
   const goToCurrent = () => { toolbar.onNavigate('TODAY'); };
@@ -65,16 +97,36 @@ const CustomToolbar: React.FC<ToolbarProps<CalendarEvent, object>> = (toolbar) =
 
       {/* Right: View Switcher */}
       <div className="flex items-center bg-black/20 rounded-lg p-1 border border-white/5">
-        <Button variant={toolbar.view === 'month' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('month')} className="text-xs">
+        <Button 
+          variant={toolbar.view === 'month' ? 'secondary' : 'ghost'} 
+          size="sm" 
+          onClick={() => handleViewChange('month')} 
+          className={toolbar.view === 'month' ? "text-xs bg-white/10" : "text-xs"}
+        >
           <CalendarDays className="mr-2 h-3 w-3" /> Month
         </Button>
-        <Button variant={toolbar.view === 'week' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('week')} className="text-xs">
+        <Button 
+          variant={toolbar.view === 'week' ? 'secondary' : 'ghost'} 
+          size="sm" 
+          onClick={() => handleViewChange('week')} 
+          className={toolbar.view === 'week' ? "text-xs bg-white/10" : "text-xs"}
+        >
           Week
         </Button>
-        <Button variant={toolbar.view === 'day' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('day')} className="text-xs">
+        <Button 
+          variant={toolbar.view === 'day' ? 'secondary' : 'ghost'} 
+          size="sm" 
+          onClick={() => handleViewChange('day')} 
+          className={toolbar.view === 'day' ? "text-xs bg-white/10" : "text-xs"}
+        >
           Day
         </Button>
-        <Button variant={toolbar.view === 'agenda' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('agenda')} className="text-xs">
+        <Button 
+          variant={toolbar.view === 'agenda' ? 'secondary' : 'ghost'} 
+          size="sm" 
+          onClick={() => handleViewChange('agenda')} 
+          className={toolbar.view === 'agenda' ? "text-xs bg-white/10" : "text-xs"}
+        >
           <List className="mr-2 h-3 w-3" /> Agenda
         </Button>
       </div>
@@ -82,7 +134,7 @@ const CustomToolbar: React.FC<ToolbarProps<CalendarEvent, object>> = (toolbar) =
   );
 };
 
-export default function MasterCalendar({ data }: { data: any }) {
+export default function MasterCalendar({ data }: { data: CalendarData }) {
   const [view, setView] = useState<View>(Views.MONTH);
   const [date, setDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -92,7 +144,7 @@ export default function MasterCalendar({ data }: { data: any }) {
     const allEvents: CalendarEvent[] = [];
 
     // Bookings (Blue)
-    data.bookings.forEach((b: any) => {
+    data.bookings.forEach((b) => {
       if (b.event_date) {
         const d = new Date(b.event_date);
         d.setHours(12, 0, 0, 0); 
@@ -101,28 +153,28 @@ export default function MasterCalendar({ data }: { data: any }) {
           title: `${b.full_name}`,
           start: d,
           end: d,
-          type: 'booking',
           resource: b,
+          type: 'booking',
         });
       }
     });
 
     // Rentals (Purple)
-    data.rentals.forEach((r: any) => {
+    data.rentals.forEach((r) => {
       if (r.start_date && r.end_date) {
         allEvents.push({
           id: `rental-${r.id}`,
           title: `Rent: ${r.client_name}`,
           start: new Date(r.start_date),
           end: new Date(r.end_date),
-          type: 'rental',
           resource: r,
+          type: 'rental',
         });
       }
     });
 
     // Orders (Orange)
-    data.orders.forEach((o: any) => {
+    data.orders.forEach((o) => {
       if (o.created_at) {
         const d = new Date(o.created_at);
         allEvents.push({
@@ -130,8 +182,8 @@ export default function MasterCalendar({ data }: { data: any }) {
           title: `Order: ${o.customer_name}`,
           start: d,
           end: d,
-          type: 'order',
           resource: o,
+          type: 'order',
         });
       }
     });
@@ -139,10 +191,10 @@ export default function MasterCalendar({ data }: { data: any }) {
     return allEvents;
   }, [data]);
 
-  // --- 2. Custom Styles for Events (FIXED) ---
+  // --- 2. Custom Styles for Events ---
   const eventPropGetter = (event: CalendarEvent) => {
     // Default Style (Bookings - Blue)
-    let newStyle = {
+    const newStyle = {
       backgroundColor: '#2563eb', // blue-600
       color: 'white',
       borderRadius: '6px',
@@ -170,6 +222,11 @@ export default function MasterCalendar({ data }: { data: any }) {
 
   const handleNavigate = (newDate: Date) => setDate(newDate);
   const handleViewChange = (newView: View) => setView(newView);
+
+  // Helper type guards for the dialog
+  const isBooking = (r: any): r is BookingResource => 'inquiry_id' in r;
+  const isRental = (r: any): r is RentalResource => 'booking_id' in r;
+  const isOrder = (r: any): r is OrderResource => 'order_id' in r;
 
   return (
     <div className="h-[800px] bg-zinc-950/50 backdrop-blur-sm p-6 rounded-2xl border border-white/10 shadow-2xl">
@@ -253,9 +310,9 @@ export default function MasterCalendar({ data }: { data: any }) {
                 <div className="pt-2">
                   <div className="bg-black/30 rounded-md p-2 text-xs font-mono text-muted-foreground text-center border border-white/5 select-all">
                     ID: {
-                      selectedEvent.resource.inquiry_id || 
-                      selectedEvent.resource.booking_id || 
-                      selectedEvent.resource.order_id
+                      (isBooking(selectedEvent.resource) && selectedEvent.resource.inquiry_id) || 
+                      (isRental(selectedEvent.resource) && selectedEvent.resource.booking_id) || 
+                      (isOrder(selectedEvent.resource) && selectedEvent.resource.order_id)
                     }
                   </div>
                 </div>

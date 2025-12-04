@@ -8,22 +8,70 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, TrendingUp, Users, Camera, DollarSign } from "lucide-react";
+import { Loader2, TrendingUp, Users, Camera, DollarSign, LucideIcon } from "lucide-react"; // Import LucideIcon type
 import { getAnalyticsData } from "@/lib/actions";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
+// --- Types ---
+interface MonthlyDataPoint {
+  name: string;
+  fullDate: string;
+  bookings: number;
+  rentals: number;
+  orders: number;
+  revenue: number;
+}
+
+interface StaffPerformanceData {
+  name: string;
+  events: number;
+  edits: number;
+}
+
+interface CategoryDataPoint {
+  name: string;
+  value: number;
+  [key: string]: string | number;
+}
+
+interface AnalyticsData {
+  chartData: MonthlyDataPoint[];
+  staffPerformance: StaffPerformanceData[];
+  categoryData: CategoryDataPoint[];
+  totals: {
+    bookings: number;
+    rentals: number;
+    orders: number;
+    revenue: number;
+  };
+}
+
+interface SummaryCardProps {
+  title: string;
+  value: string | number;
+  icon: LucideIcon;
+  color: string;
+}
+
 export default function AnalyticsDashboard() {
   const [range, setRange] = useState<'3m' | '6m' | '1y' | 'all'>('6m');
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const result = await getAnalyticsData(range);
-      setData(result);
-      setLoading(false);
+      try {
+        const result = await getAnalyticsData(range);
+        // Ensure result matches the expected structure or handle accordingly
+        // For now assuming getAnalyticsData returns compatible data
+        setData(result as unknown as AnalyticsData); 
+      } catch (error) {
+        console.error("Failed to load analytics", error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
   }, [range]);
@@ -32,13 +80,15 @@ export default function AnalyticsDashboard() {
     return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
+  if (!data) return <div className="p-8 text-center">No data available</div>;
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Controls */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-white">Performance Overview</h2>
-        <Select value={range} onValueChange={(val: any) => setRange(val)}>
+        <Select value={range} onValueChange={(val: '3m' | '6m' | '1y' | 'all') => setRange(val)}>
           <SelectTrigger className="w-[180px] bg-white/5 border-white/10">
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
@@ -117,7 +167,7 @@ export default function AnalyticsDashboard() {
                         fill="#8884d8"
                         dataKey="value"
                       >
-                        {data.categoryData.map((entry: any, index: number) => (
+                        {data.categoryData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -180,7 +230,7 @@ export default function AnalyticsDashboard() {
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, color }: any) {
+function SummaryCard({ title, value, icon: Icon, color }: SummaryCardProps) {
   return (
     <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

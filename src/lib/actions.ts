@@ -16,6 +16,32 @@ import {
 } from '@/lib/types';
 import { RentalOrderItem } from '@/lib/types';
 
+// --- Types for Analytics & Reports ---
+interface DatabaseBooking {
+  id: number;
+  event_date: string | null;
+  package_amount?: number | null; // For old logic fallback
+  assigned_photographers: string[] | null;
+  assigned_editor: string | null;
+  event_type: string | null;
+  financial_entry?: {
+    package_amount: number | null;
+    final_amount: number | null;
+  } | null;
+}
+
+interface DatabaseRental {
+  id: number;
+  start_date: string;
+  total_amount: number;
+}
+
+interface DatabaseOrder {
+  id: number;
+  created_at: string;
+  total_amount: number;
+}
+
 // --- generateMonthlyReport function ---
 export async function generateMonthlyReport(month: string, year: string) {
   const cookieStore = await cookies();
@@ -984,31 +1010,13 @@ export async function updateProductOrderPhotographerCommission(
     }
   );
 
-  // Security Check: Ensure user is authenticated and management
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    console.error("Error fetching session:", sessionError);
-    return { error: sessionError.message };
-  }
+  const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { error: "Not authenticated" };
 
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .single();
-
-  if (profileError) {
-    console.error("Error fetching profile:", profileError);
-    return { error: profileError.message };
-  }
-
-  if (profile?.role !== 'management') {
-    return { error: "Permission denied. Only management can update financial data." };
-  }
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
 
   try {
-    // 1. Delete existing details for this order
     const { error: deleteError } = await supabase
       .from('product_order_photographer_commission')
       .delete()
@@ -1016,7 +1024,6 @@ export async function updateProductOrderPhotographerCommission(
 
     if (deleteError) throw deleteError;
 
-    // 2. Insert new details (only those with amount > 0)
     const detailsToInsert = photographerDetails
       .filter(detail => detail.amount > 0)
       .map(detail => ({
@@ -1459,17 +1466,28 @@ export async function generateMySalaryReport(month: string, year: string) {
       .lte('order.created_at', endDate);
 
     // 3. --- NEW: Editing Earnings ---
-    // We look for financial_entries where this user is the assigned editor
+    // Type casting for the raw editing response
+    interface RawEditingEntry {
+        editor_expenses: number;
+        booking: {
+            inquiry_id: string;
+            event_date: string;
+        } | {
+            inquiry_id: string;
+            event_date: string;
+        }[];
+    }
+
     const { data: editingEarningsRaw } = await supabase
       .from('financial_entries')
       .select('editor_expenses, booking:client_bookings!inner(inquiry_id, event_date)')
-      .eq('editor_name', userName) // Match the editor name
-      .gt('editor_expenses', 0)    // Only if they got paid > 0
+      .eq('editor_name', userName)
+      .gt('editor_expenses', 0)
       .gte('booking.event_date', startDate.split('T')[0])
       .lte('booking.event_date', endDate.split('T')[0]);
 
     // Map editingEarnings to correct type (booking should be an object, not array)
-    const editingEarnings = (editingEarningsRaw || []).map((item: any) => ({
+    const editingEarnings = ((editingEarningsRaw as unknown as RawEditingEntry[]) || []).map((item) => ({
       editor_expenses: item.editor_expenses,
       booking: Array.isArray(item.booking) ? item.booking[0] : item.booking
     }));
@@ -1479,7 +1497,7 @@ export async function generateMySalaryReport(month: string, year: string) {
     const excelBlob = await generateUserSalaryReport({
       bookingEarnings: bookingEarnings || [],
       productEarnings: productEarnings || [],
-      editingEarnings: editingEarnings, // <--- Pass mapped data
+      editingEarnings: editingEarnings,
       userName,
       month,
       year
@@ -2262,7 +2280,15 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
     .neq('status', 'Cancelled');
 
   // 3. Aggregate Monthly Revenue & Counts
-  const monthlyData: Record<string, any> = {};
+  interface MonthlyData {
+    name: string;
+    fullDate: string;
+    bookings: number;
+    rentals: number;
+    orders: number;
+    revenue: number;
+  }
+  const monthlyData: Record<string, MonthlyData> = {};
 
   const processEntry = (dateStr: string, type: 'bookings' | 'rentals' | 'orders', amount: number) => {
     if (!dateStr) return;
@@ -2282,14 +2308,14 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
   };
 
   // Process Bookings with proper financial mapping
-  bookings?.forEach((b: any) => {
+  (bookings as unknown as DatabaseBooking[])?.forEach((b) => {
     // Prefer final_amount, fallback to package_amount, fallback to 0
     const revenue = b.financial_entry?.final_amount || b.financial_entry?.package_amount || 0;
-    processEntry(b.event_date, 'bookings', revenue);
+    processEntry(b.event_date || '', 'bookings', revenue);
   });
 
-  rentals?.forEach(r => processEntry(r.start_date, 'rentals', r.total_amount || 0));
-  orders?.forEach(o => processEntry(o.created_at, 'orders', o.total_amount || 0));
+  (rentals as DatabaseRental[])?.forEach(r => processEntry(r.start_date, 'rentals', r.total_amount || 0));
+  (orders as DatabaseOrder[])?.forEach(o => processEntry(o.created_at, 'orders', o.total_amount || 0));
 
   // Convert to array and sort by date
   const chartData = Object.values(monthlyData).sort((a: any, b: any) => a.fullDate.localeCompare(b.fullDate));
@@ -2297,7 +2323,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
   // 4. Aggregate Staff Performance
   const staffStats: Record<string, { name: string, events: number, edits: number }> = {};
 
-  bookings?.forEach((b: any) => {
+  (bookings as unknown as DatabaseBooking[])?.forEach((b) => {
     // Count Photographers
     if (Array.isArray(b.assigned_photographers)) {
         b.assigned_photographers.forEach((name: string) => {
@@ -2317,7 +2343,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
 
   // 5. Category Distribution
   const categoryStats: Record<string, number> = {};
-  bookings?.forEach((b: any) => {
+  (bookings as unknown as DatabaseBooking[])?.forEach((b) => {
     const type = b.event_type || 'Other';
     categoryStats[type] = (categoryStats[type] || 0) + 1;
   });
