@@ -40,6 +40,7 @@ interface DatabaseOrder {
   id: number;
   created_at: string;
   total_amount: number;
+  assigned_photographers: string[] | null; // <--- Added this field
 }
 
 // --- generateMonthlyReport function ---
@@ -2274,7 +2275,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
 
   const { data: orders } = await supabase
     .from('product_orders')
-    .select('id, created_at, total_amount')
+    .select('id, created_at, total_amount, assigned_photographers') // <--- Added assigned_photographers
     .gte('created_at', startIso)
     .neq('status', 'Cancelled');
 
@@ -2319,26 +2320,40 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
   // Convert to array and sort by date
   const chartData = Object.values(monthlyData).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
 
-  // 4. Aggregate Staff Performance
-  const staffStats: Record<string, { name: string, events: number, edits: number }> = {};
+  // 4. Aggregate Staff Performance (Updated for Products)
+  const staffStats: Record<string, { name: string, events: number, edits: number, products: number }> = {};
 
+  // Process Events & Edits
   (bookings as unknown as DatabaseBooking[])?.forEach((b) => {
     // Count Photographers
     if (Array.isArray(b.assigned_photographers)) {
         b.assigned_photographers.forEach((name: string) => {
-            if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0 };
+            if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0, products: 0 };
             staffStats[name].events += 1;
         });
     }
     // Count Editor
     if (b.assigned_editor) {
       const name = b.assigned_editor;
-      if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0 };
+      if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0, products: 0 };
       staffStats[name].edits += 1;
     }
   });
 
-  const staffPerformance = Object.values(staffStats).sort((a, b) => (b.events + b.edits) - (a.events + a.edits));
+  // Process Products
+  (orders as DatabaseOrder[])?.forEach((o) => {
+    if (Array.isArray(o.assigned_photographers)) {
+      o.assigned_photographers.forEach((name: string) => {
+        if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0, products: 0 };
+        staffStats[name].products += 1;
+      });
+    }
+  });
+
+  // Sort by total activity
+  const staffPerformance = Object.values(staffStats).sort((a, b) => 
+    (b.events + b.edits + b.products) - (a.events + a.edits + a.products)
+  );
 
   // 5. Category Distribution
   const categoryStats: Record<string, number> = {};

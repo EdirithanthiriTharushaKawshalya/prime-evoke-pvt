@@ -22,14 +22,13 @@ export default async function AnalyticsPage() {
   if (!session) redirect("/login");
 
   // Fetch Profile to determine Role
-  // We explicitly ALLOW 'staff' here by not redirecting them.
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', session.user.id)
     .single();
   
-  // Default to 'staff' if role is missing, but pass it to dashboard
+  // Default to 'staff' if role is missing
   const userRole = profile?.role || 'staff';
 
   return (
@@ -51,7 +50,7 @@ export default async function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Dashboard Component - Now handles its own internal visibility */}
+        {/* Pass userRole to the Dashboard Component */}
         <AnalyticsDashboard userRole={userRole} />
 
       </div>
