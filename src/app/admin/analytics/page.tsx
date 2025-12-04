@@ -40,7 +40,7 @@ export default async function AnalyticsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 md:mb-8">
           <Link href="/admin">
-            <Button variant="ghost" size="icon" className="shrink-0 border border-white/5 bg-white/5 hover:bg-white/10">
+            <Button variant="ghost" size="icon" className="shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
