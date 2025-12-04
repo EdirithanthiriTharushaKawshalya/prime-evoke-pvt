@@ -85,6 +85,7 @@ export type FinancialEntry = {
   photographer_expenses: number | null;
   videographer_expenses: number | null;
   editor_expenses: number | null;
+  editor_name: string | null; // <--- NEW
   company_expenses: number | null;
   other_expenses: number | null;
   final_amount: number | null;
@@ -105,6 +106,7 @@ export type Booking = {
   studio_slug: string;
   status: string | null;
   assigned_photographers: string[] | null;
+  assigned_editor: string | null; // <--- NEW
   inquiry_id: string | null;
   financial_entry?: FinancialEntry | null;
 };

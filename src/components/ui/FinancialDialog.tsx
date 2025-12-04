@@ -34,6 +34,7 @@ export function FinancialDialog({ booking, open, onOpenChange, packages }: Finan
     photographer_expenses: booking.financial_entry?.photographer_expenses || 0,
     videographer_expenses: booking.financial_entry?.videographer_expenses || 0,
     editor_expenses: booking.financial_entry?.editor_expenses || 0,
+    editor_name: booking.financial_entry?.editor_name || booking.assigned_editor || "", // <--- Default to assigned editor
     company_expenses: booking.financial_entry?.company_expenses || 0,
     other_expenses: booking.financial_entry?.other_expenses || 0,
     final_amount: booking.financial_entry?.final_amount || 0,
@@ -85,6 +86,7 @@ export function FinancialDialog({ booking, open, onOpenChange, packages }: Finan
         photographer_expenses: booking.financial_entry?.photographer_expenses || 0,
         videographer_expenses: booking.financial_entry?.videographer_expenses || 0,
         editor_expenses: booking.financial_entry?.editor_expenses || 0,
+        editor_name: booking.financial_entry?.editor_name || booking.assigned_editor || "", // <--- Reset with assigned editor
         company_expenses: booking.financial_entry?.company_expenses || 0,
         other_expenses: booking.financial_entry?.other_expenses || 0,
         final_amount: booking.financial_entry?.final_amount || 0,
@@ -111,7 +113,7 @@ export function FinancialDialog({ booking, open, onOpenChange, packages }: Finan
       
       setPhotographerDetails(newDetails);
     }
-  }, [open, booking.financial_entry, booking.event_type, booking.package_name, assignedStaff, booking.id]);
+  }, [open, booking.financial_entry, booking.event_type, booking.package_name, assignedStaff, booking.id, booking.assigned_editor]);
 
   // Calculate total photographer expenses from individual amounts
   useEffect(() => {
@@ -186,6 +188,8 @@ export function FinancialDialog({ booking, open, onOpenChange, packages }: Finan
       // First update the main financial entry
       const result = await updateFinancialEntry(booking.id, {
         ...formData,
+        // Ensure we save the current editor name, even if it changed from the booking assignment
+        editor_name: formData.editor_name || booking.assigned_editor || "Unassigned",
         final_amount: formData.package_amount,
       });
       
@@ -359,15 +363,24 @@ export function FinancialDialog({ booking, open, onOpenChange, packages }: Finan
                   <Label htmlFor="editor_expenses" className="text-right">
                     Editor
                   </Label>
-                  <Input
-                    id="editor_expenses"
-                    name="editor_expenses"
-                    type="number"
-                    value={formData.editor_expenses}
-                    onChange={handleChange}
-                    className="col-span-3"
-                    placeholder="0"
-                  />
+                  
+                  {/* Visual Indicator of who is getting paid */}
+                  <div className="col-span-3 flex gap-2">
+                    <div className="relative flex-1">
+                        <Input
+                            id="editor_expenses"
+                            name="editor_expenses"
+                            type="number"
+                            value={formData.editor_expenses}
+                            onChange={handleChange}
+                            placeholder="0"
+                        />
+                        {/* Show name badge inside or below input */}
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                            {formData.editor_name || "Unassigned"}
+                        </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-4 items-center gap-4">

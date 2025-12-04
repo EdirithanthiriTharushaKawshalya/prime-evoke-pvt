@@ -360,7 +360,7 @@ export async function deleteBooking(bookingId: number) {
   return { success: true };
 }
 
-// --- updateFinancialEntry function ---
+// --- UPDATE: updateFinancialEntry function ---
 export async function updateFinancialEntry(
   bookingId: number,
   financialData: {
@@ -370,6 +370,7 @@ export async function updateFinancialEntry(
     photographer_expenses?: number;
     videographer_expenses?: number;
     editor_expenses?: number;
+    editor_name?: string; // NEW: Accept editor_name field
     company_expenses?: number;
     other_expenses?: number;
     final_amount?: number;
@@ -1416,96 +1417,86 @@ export async function updateProductOrder(
   return { success: true };
 }
 
-// --- generateMySalaryReport function ---
+// --- UPDATE: generateMySalaryReport function ---
 export async function generateMySalaryReport(month: string, year: string) {
   const cookieStore = await cookies();
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-      },
-    }
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
   );
 
-  // Security Check: Get the logged-in user's session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError || !session) {
-    return { error: "Not authenticated. Please log in." };
-  }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
 
-  // Get the user's full name from their profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name')
     .eq('id', session.user.id)
     .single();
 
-  if (!profile || !profile.full_name) {
-    return { error: "Could not find your user profile. Please update your profile name." };
-  }
-
+  if (!profile?.full_name) return { error: "Profile not found" };
   const userName = profile.full_name;
 
   try {
-    // 1. Calculate date range for the selected month
     const startDate = new Date(parseInt(year), parseInt(month) - 1, 1).toISOString();
     const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59).toISOString();
 
-    // 2. Fetch booking earnings for this user *within the date range*
-    // We must do an inner join and filter on the booking's event_date
-    const { data: bookingEarnings, error: bError } = await supabase
+    // 1. Photography Earnings (Existing)
+    const { data: bookingEarnings } = await supabase
       .from('photographer_financial_details')
       .select('*, booking:client_bookings!inner(inquiry_id, event_date)')
       .eq('staff_name', userName)
-      .gte('booking.event_date', startDate.split('T')[0]) // Filter on joined table
-      .lte('booking.event_date', endDate.split('T')[0]);  // Filter on joined table
+      .gte('booking.event_date', startDate.split('T')[0])
+      .lte('booking.event_date', endDate.split('T')[0]);
 
-    if (bError) throw bError;
-
-    // 3. Fetch product commission earnings for this user *within the date range*
-    // We must do an inner join and filter on the order's created_at
-    const { data: productEarnings, error: pError } = await supabase
+    // 2. Product Commissions (Existing)
+    const { data: productEarnings } = await supabase
       .from('product_order_photographer_commission')
       .select('*, order:product_orders!inner(order_id, created_at)')
       .eq('staff_name', userName)
-      .gte('order.created_at', startDate) // Filter on joined table
-      .lte('order.created_at', endDate);  // Filter on joined table
+      .gte('order.created_at', startDate)
+      .lte('order.created_at', endDate);
 
-    if (pError) throw pError;
+    // 3. --- NEW: Editing Earnings ---
+    // We look for financial_entries where this user is the assigned editor
+    const { data: editingEarningsRaw } = await supabase
+      .from('financial_entries')
+      .select('editor_expenses, booking:client_bookings!inner(inquiry_id, event_date)')
+      .eq('editor_name', userName) // Match the editor name
+      .gt('editor_expenses', 0)    // Only if they got paid > 0
+      .gte('booking.event_date', startDate.split('T')[0])
+      .lte('booking.event_date', endDate.split('T')[0]);
 
-    if (bookingEarnings?.length === 0 && productEarnings?.length === 0) {
-      return { error: `No earnings data found for your profile for ${month}/${year}.` };
-    }
+    // Map editingEarnings to correct type (booking should be an object, not array)
+    const editingEarnings = (editingEarningsRaw || []).map((item: any) => ({
+      editor_expenses: item.editor_expenses,
+      booking: Array.isArray(item.booking) ? item.booking[0] : item.booking
+    }));
 
-    // 4. Import and use the Excel generator
+    // Generate Report
     const { generateUserSalaryReport } = await import('@/lib/excelExport');
     const excelBlob = await generateUserSalaryReport({
       bookingEarnings: bookingEarnings || [],
       productEarnings: productEarnings || [],
-      userName: userName,
-      month: month, // Pass month and year
-      year: year
+      editingEarnings: editingEarnings, // <--- Pass mapped data
+      userName,
+      month,
+      year
     });
 
-    // 5. Convert blob to base64 for response
     const buffer = await excelBlob.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
 
     return { 
       success: true, 
-      data: base64,
-      fileName: `Salary-Report-${userName.replace(' ', '-')}-${month}-${year}.xlsx`
+      data: base64, 
+      fileName: `Salary-${userName}-${month}-${year}.xlsx` 
     };
 
-  } catch (error: unknown) {
-    console.error("Error generating user salary report:", error);
-    const message = error instanceof Error ? error.message : "An unexpected error occurred";
-    return { error: `Failed to generate report: ${message}` };
+  } catch (error: any) {
+    console.error("Error generating salary report:", error);
+    return { error: error.message };
   }
 }
 
@@ -2185,4 +2176,35 @@ export async function getCalendarData() {
     rentals: rentals || [], 
     orders: orders || [] 
   };
+}
+
+// --- NEW: Assign Editor ---
+export async function updateBookingEditor(
+  bookingId: number,
+  editorName: string | null
+) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Auth Check
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  // Update
+  const { error } = await supabase
+    .from('client_bookings')
+    .update({ assigned_editor: editorName })
+    .eq('id', bookingId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/bookings');
+  return { success: true };
 }

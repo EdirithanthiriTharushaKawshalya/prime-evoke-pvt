@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Edit, Mail, Calendar, User, Package, Building, Phone, Camera, DollarSign } from "lucide-react";
 import { UpdateBookingStatus } from "./UpdateBookingStatus";
 import { AssignPhotographers } from "./AssignPhotographers";
+import { AssignEditor } from "./AssignEditor"; // <--- Import
 import { DeleteBookingButton } from "./DeleteBookingButton";
 import { EditBookingDialog } from "./EditBookingDialog";
 import { FinancialDialog } from "./FinancialDialog";
@@ -118,19 +119,27 @@ export function BookingCard({ booking, userRole, availableStaff, packages }: Boo
             </div>
           )}
 
-          {/* Assigned Photographers */}
-          {booking.assigned_photographers && booking.assigned_photographers.length > 0 && (
-            <div className="text-sm pt-1">
-              <span className="text-muted-foreground block mb-1">Assigned Staff:</span>
-              <div className="flex flex-wrap gap-1">
-                {booking.assigned_photographers.map((photographer, index) => (
-                  <Badge key={index} variant="outline" className="text-[10px]">
-                    {photographer}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Assigned Staff Section */}
+          <div className="text-sm pt-1 space-y-1">
+             {booking.assigned_photographers && booking.assigned_photographers.length > 0 && (
+               <div className="flex flex-wrap gap-1 items-center">
+                 <span className="text-muted-foreground text-xs">Shooters:</span>
+                 {booking.assigned_photographers.map((p, i) => (
+                   <Badge key={i} variant="outline" className="text-[10px]">{p}</Badge>
+                 ))}
+               </div>
+             )}
+             
+             {/* NEW: Editor Badge */}
+             {booking.assigned_editor && (
+               <div className="flex items-center gap-1">
+                 <span className="text-muted-foreground text-xs">Editor:</span>
+                 <Badge variant="secondary" className="text-[10px] bg-purple-500/10 text-purple-400 border-purple-500/20">
+                   {booking.assigned_editor}
+                 </Badge>
+               </div>
+             )}
+          </div>
 
            {/* Message Preview */}
           {booking.message && (
@@ -151,13 +160,23 @@ export function BookingCard({ booking, userRole, availableStaff, packages }: Boo
                 <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => setIsFinancialDialogOpen(true)}>
                   <DollarSign className="h-3 w-3 mr-1" /> Financial
                 </Button>
-                <div className="flex gap-2">
+                
+                <div className="flex gap-2 w-full sm:w-auto">
+                    {/* Photographers */}
                     <AssignPhotographers
                       bookingId={booking.id}
                       currentAssignments={booking.assigned_photographers || []}
                       availableStaff={availableStaff}
                       userRole={userRole}
                     />
+                    
+                    {/* NEW: Editor Assignment */}
+                    <AssignEditor 
+                      bookingId={booking.id}
+                      currentEditor={booking.assigned_editor || null}
+                      availableStaff={availableStaff}
+                    />
+                    
                     <DeleteBookingButton bookingId={booking.id} userRole={userRole} />
                 </div>
               </>

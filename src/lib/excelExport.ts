@@ -682,7 +682,7 @@ function generateFinancialRecordsSheet(records: FinancialRecord[]): (string | nu
   return [headers, ...data];
 }
 
-// --- NEW: generateSalarySheet function ---
+// --- UPDATED: generateSalarySheet function ---
 function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[]): (string | number)[][] {
   const headers = [
     'Staff Member', 
@@ -701,15 +701,26 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[])
 
   // 1. Calculate earnings from Bookings
   bookings.forEach(booking => {
+    // A. Photographers (Existing Logic)
     if (booking.financial_entry?.photographer_details) {
       booking.financial_entry.photographer_details.forEach(detail => {
         const staffName = detail.staff_name;
-        if (!salaryData[staffName]) {
-          salaryData[staffName] = { bookingEarnings: 0, productEarnings: 0, totalEarnings: 0 };
-        }
+        if (!salaryData[staffName]) salaryData[staffName] = { bookingEarnings: 0, productEarnings: 0, totalEarnings: 0 };
         salaryData[staffName].bookingEarnings += detail.amount;
         salaryData[staffName].totalEarnings += detail.amount;
       });
+    }
+
+    // B. Editor (NEW LOGIC)
+    if (booking.financial_entry?.editor_name && booking.financial_entry?.editor_expenses) {
+        const editorName = booking.financial_entry.editor_name;
+        const amount = booking.financial_entry.editor_expenses;
+        
+        if (amount > 0) {
+            if (!salaryData[editorName]) salaryData[editorName] = { bookingEarnings: 0, productEarnings: 0, totalEarnings: 0 };
+            salaryData[editorName].bookingEarnings += amount;
+            salaryData[editorName].totalEarnings += amount;
+        }
     }
   });
 
@@ -769,8 +780,7 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[])
   return [headers, ...data];
 }
 
-// --- NEW: generateUserSalaryReport function ---
-// This interface defines the data we expect
+// --- NEW Interface for User Salary ---
 interface BookingEarningItem {
   amount: number;
   booking?: {
@@ -787,25 +797,35 @@ interface ProductEarningItem {
   };
 }
 
+interface EditingEarningItem {
+  editor_expenses: number;
+  booking?: {
+    inquiry_id?: string;
+    event_date?: string;
+  };
+}
+
 export interface UserSalaryData {
   bookingEarnings: BookingEarningItem[];
   productEarnings: ProductEarningItem[];
+  editingEarnings: EditingEarningItem[]; // <--- Add this
   userName: string;
-  month: string; // <-- ADDED
-  year: string;  // <-- ADDED
+  month: string;
+  year: string;
 }
 
+// --- UPDATE: generateUserSalaryReport ---
 export async function generateUserSalaryReport(data: UserSalaryData): Promise<Blob> {
-  // Get all data, including month and year
-  const { bookingEarnings, productEarnings, userName, month, year } = data;
+  const { bookingEarnings, productEarnings, editingEarnings, userName, month, year } = data;
 
   const XLSX = await import('xlsx');
   const workbook = XLSX.utils.book_new();
 
   let totalBookingEarnings = 0;
   let totalProductEarnings = 0;
+  let totalEditingEarnings = 0; // <--- Track editing total
 
-  // 1. Create Booking Earnings Sheet
+  // 1. Photography Earnings Sheet
   const bookingHeaders = ['Inquiry ID', 'Event Date', 'Amount'];
   const bookingData = bookingEarnings.map(item => {
     totalBookingEarnings += item.amount;
@@ -816,22 +836,39 @@ export async function generateUserSalaryReport(data: UserSalaryData): Promise<Bl
     ];
   });
   
-  // Add message if no data
-  if(bookingData.length === 0) {
-    bookingData.push(['No booking earnings found for this period.']);
-  }
+  if(bookingData.length === 0) bookingData.push(['No photography earnings found.']);
   
   bookingData.push(['', '', '']);
-  bookingData.push(
-    ['Total Booking Earnings:', '', `Rs. ${totalBookingEarnings.toLocaleString()}`]
-  );
+  bookingData.push(['Total Photography:', '', `Rs. ${totalBookingEarnings.toLocaleString()}`]);
+  
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet([bookingHeaders, ...bookingData]), 
-    'Booking Earnings'
+    'Photography'
   );
 
-  // 2. Create Product Commission Sheet
-  const productHeaders = ['Order ID', 'Order Date', 'Amount'];
+  // 2. --- NEW: Editing Earnings Sheet ---
+  const editingHeaders = ['Inquiry ID', 'Event Date', 'Editing Fee'];
+  const editingData = editingEarnings.map(item => {
+    totalEditingEarnings += item.editor_expenses;
+    return [
+      item.booking?.inquiry_id || 'N/A',
+      item.booking?.event_date ? new Date(item.booking.event_date).toLocaleDateString() : 'N/A',
+      `Rs. ${item.editor_expenses.toLocaleString()}`
+    ];
+  });
+
+  if(editingData.length === 0) editingData.push(['No editing earnings found.']);
+
+  editingData.push(['', '', '']);
+  editingData.push(['Total Editing:', '', `Rs. ${totalEditingEarnings.toLocaleString()}`]);
+
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet([editingHeaders, ...editingData]), 
+    'Editing'
+  );
+
+  // 3. Product Commissions Sheet
+  const productHeaders = ['Order ID', 'Order Date', 'Commission'];
   const productData = productEarnings.map(item => {
     totalProductEarnings += item.amount;
     return [
@@ -841,44 +878,35 @@ export async function generateUserSalaryReport(data: UserSalaryData): Promise<Bl
     ];
   });
 
-  // Add message if no data
-  if(productData.length === 0) {
-    productData.push(['No product commissions found for this period.']);
-  }
+  if(productData.length === 0) productData.push(['No product commissions found.']);
 
   productData.push(['', '', '']);
-  productData.push(
-    ['Total Product Commission:', '', `Rs. ${totalProductEarnings.toLocaleString()}`]
-  );
+  productData.push(['Total Commission:', '', `Rs. ${totalProductEarnings.toLocaleString()}`]);
+  
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet([productHeaders, ...productData]), 
-    'Product Commission'
+    'Products'
   );
   
-  // 3. Create Summary Sheet
-  const grandTotal = totalBookingEarnings + totalProductEarnings;
+  // 4. Summary Sheet
+  const grandTotal = totalBookingEarnings + totalEditingEarnings + totalProductEarnings;
   const summaryHeaders = ['Item', 'Amount'];
   const summaryData = [
     ['User:', userName],
-    // Add the report period
-    ['Report Period:', `${getMonthName(parseInt(month))} ${year}`], 
+    ['Period:', `${getMonthName(parseInt(month))} ${year}`], 
     ['', ''],
-    ['Total Booking Earnings', `Rs. ${totalBookingEarnings.toLocaleString()}`],
-    ['Total Product Commission', `Rs. ${totalProductEarnings.toLocaleString()}`],
+    ['Photography Earnings', `Rs. ${totalBookingEarnings.toLocaleString()}`],
+    ['Editing Earnings', `Rs. ${totalEditingEarnings.toLocaleString()}`], // <--- Added Line
+    ['Product Commission', `Rs. ${totalProductEarnings.toLocaleString()}`],
     ['', ''],
     ['GRAND TOTAL', `Rs. ${grandTotal.toLocaleString()}`]
   ];
   
-  // Make sure the main workbook always has the Summary sheet first
   const summarySheet = XLSX.utils.aoa_to_sheet([summaryHeaders, ...summaryData]);
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
 
-  // Re-order sheets to put Summary first
   workbook.SheetNames.unshift(workbook.SheetNames.pop() as string);
 
-  // Convert to Excel blob
   const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-  return new Blob([excelBuffer], { 
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-  });
+  return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
