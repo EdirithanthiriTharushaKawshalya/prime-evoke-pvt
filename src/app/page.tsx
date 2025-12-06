@@ -84,7 +84,7 @@ export default function HomePage() {
             {/* 4. Evoke Rentals */}
             <BrandCard 
               href="/rentals"
-              title="Evoke Rentals"
+              title="Evoke Rental House"
               subtitle="Equipment Hire"
               description="Access our professional arsenal. Cameras, lenses, and lighting available for your own productions."
               icon={Camera}
