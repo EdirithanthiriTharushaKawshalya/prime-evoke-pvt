@@ -28,9 +28,10 @@ import { updateFinancialRecord } from "@/lib/actions";
 
 interface EditFinancialDialogProps {
   record: FinancialRecord;
+  staffMembers: { id: number; name: string }[]; // <--- Added Prop
 }
 
-export function EditFinancialDialog({ record }: EditFinancialDialogProps) {
+export function EditFinancialDialog({ record, staffMembers }: EditFinancialDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -42,6 +43,8 @@ export function EditFinancialDialog({ record }: EditFinancialDialogProps) {
     category: record.category,
     amount: record.amount.toString(),
     payment_method: record.payment_method || "Cash",
+    // Initialize with existing staff_id or "none"
+    staff_id: record.staff_id ? record.staff_id.toString() : "none", 
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,6 +59,8 @@ export function EditFinancialDialog({ record }: EditFinancialDialogProps) {
         category: formData.category,
         amount: parseFloat(formData.amount),
         payment_method: formData.payment_method,
+        // Convert "none" string back to null
+        staff_id: formData.staff_id !== "none" ? parseInt(formData.staff_id) : null,
       });
 
       if (result.error) {
@@ -79,6 +84,7 @@ export function EditFinancialDialog({ record }: EditFinancialDialogProps) {
           <Edit className="h-4 w-4" />
         </Button>
       </DialogTrigger>
+      {/* Responsive Container */}
       <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-lg">
         <DialogHeader>
           <DialogTitle>Edit Financial Record</DialogTitle>
@@ -161,6 +167,27 @@ export function EditFinancialDialog({ record }: EditFinancialDialogProps) {
               </Select>
             </div>
           </div>
+
+          {/* Staff Assignment - Matches AddFinancialDialog Logic */}
+          {formData.type === "Expense" && (
+            <div className="space-y-2">
+              <Label>Assign to Staff (Optional)</Label>
+              <Select 
+                value={formData.staff_id} 
+                onValueChange={(val) => setFormData({...formData, staff_id: val})}
+              >
+                <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (General Expense)</SelectItem>
+                  {staffMembers.map(staff => (
+                    <SelectItem key={staff.id} value={staff.id.toString()}>
+                      {staff.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <DialogFooter className="gap-2 sm:gap-0 mt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">

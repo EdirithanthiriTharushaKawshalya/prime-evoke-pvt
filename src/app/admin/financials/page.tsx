@@ -8,7 +8,6 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// Fix 1: Removed unused 'FileText'
 import { ArrowLeft, Calendar, CreditCard, User } from "lucide-react";
 import Link from "next/link";
 import { FinancialRecord } from "@/lib/types";
@@ -16,13 +15,6 @@ import { AddFinancialDialog } from "@/components/ui/AddFinancialDialog";
 import { EditFinancialDialog } from "@/components/ui/EditFinancialDialog";
 import { DeleteFinancialButton } from "@/components/ui/DeleteFinancialButton";
 import { Badge } from "@/components/ui/badge";
-
-// Fix 2: Define an extended type for the join result
-interface FinancialRecordWithStaff extends FinancialRecord {
-  staff_member?: {
-    name: string;
-  } | null;
-}
 
 export default async function FinancialsPage() {
   const cookieStore = await cookies();
@@ -44,20 +36,21 @@ export default async function FinancialsPage() {
   
   const userRole = profileData?.role || 'staff';
 
-  // 1. Fetch Staff Members for the dropdown
-  const { data: staffMembers } = await supabase
+  // 1. Fetch Staff Members for the dropdown (New)
+  const { data: staffData } = await supabase
     .from("team_members")
     .select("id, name")
     .order("name");
+  
+  const staffMembers = staffData || [];
 
-  // 2. Fetch Financials (Include joined staff name)
+  // 2. Fetch Financial Records (Include joined staff name)
   const { data: records } = await supabase
     .from("other_financial_records")
-    .select("*, staff_member:team_members(name)")
+    .select("*, staff_member:team_members(name)") // <--- Join staff name
     .order("date", { ascending: false });
 
-  // Fix 2 applied: Cast to the extended type
-  const financials = (records as FinancialRecordWithStaff[]) || [];
+  const financials = (records as unknown as FinancialRecord[]) || [];
 
   return (
     <div className="relative min-h-screen flex flex-col">
@@ -76,7 +69,8 @@ export default async function FinancialsPage() {
           
           {userRole === 'management' && (
             <div className="w-full sm:w-auto">
-                <AddFinancialDialog staffMembers={staffMembers || []} />
+                {/* Pass staffMembers to the Add Dialog */}
+                <AddFinancialDialog staffMembers={staffMembers} />
             </div>
           )}
         </div>
@@ -109,16 +103,14 @@ export default async function FinancialsPage() {
                   {/* Middle Row: Description */}
                   <div>
                     <p className="font-medium text-base">{record.description}</p>
+                    {/* Show Paid To if exists */}
+                    {record.staff_id && (record as any).staff_member && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                            <User className="h-3 w-3" />
+                            <span>Paid to: {(record as any).staff_member.name}</span>
+                        </div>
+                    )}
                   </div>
-
-                  {/* Staff Name Display */}
-                  {/* Fix 2 applied: Removed 'as any' casting */}
-                  {record.staff_id && record.staff_member && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                      <User className="h-3 w-3" />
-                      <span>Paid to: {record.staff_member.name}</span>
-                    </div>
-                  )}
 
                   {/* Bottom Row: Badges & Payment */}
                   <div className="flex flex-wrap gap-2 items-center justify-between mt-1">
@@ -139,7 +131,8 @@ export default async function FinancialsPage() {
                     {/* Edit/Delete for Management */}
                     {userRole === 'management' && (
                       <div className="flex gap-1">
-                        <EditFinancialDialog record={record} />
+                        {/* Pass staffMembers to Edit Dialog */}
+                        <EditFinancialDialog record={record} staffMembers={staffMembers} />
                         <DeleteFinancialButton recordId={record.id} />
                       </div>
                     )}
@@ -160,9 +153,9 @@ export default async function FinancialsPage() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-white/10">
                     <TableHead className="w-[120px]">Date</TableHead>
-                    <TableHead className="w-[250px]">Description</TableHead>
-                    <TableHead>Staff</TableHead>
+                    <TableHead className="w-[300px]">Description</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Assigned Staff</TableHead>
                     <TableHead>Method</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     {userRole === 'management' && <TableHead className="text-right w-[100px]">Actions</TableHead>}
@@ -175,15 +168,9 @@ export default async function FinancialsPage() {
                         {new Date(record.date).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <div className="truncate max-w-[250px]" title={record.description}>
+                        <div className="truncate max-w-[300px]" title={record.description}>
                             {record.description}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {/* Fix 2 applied: Removed 'as any' casting */}
-                        {record.staff_member?.name ? (
-                          <Badge variant="outline" className="text-[10px]">{record.staff_member.name}</Badge>
-                        ) : "-"}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={`font-normal ${
@@ -191,6 +178,11 @@ export default async function FinancialsPage() {
                         }`}>
                           {record.category}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(record as any).staff_member?.name ? (
+                            <Badge variant="secondary" className="text-[10px]">{(record as any).staff_member.name}</Badge>
+                        ) : "-"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{record.payment_method}</TableCell>
                       <TableCell className={`text-right font-bold ${
@@ -202,7 +194,8 @@ export default async function FinancialsPage() {
                       {userRole === 'management' && (
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <EditFinancialDialog record={record} />
+                            {/* Pass staffMembers to Edit Dialog */}
+                            <EditFinancialDialog record={record} staffMembers={staffMembers} />
                             <DeleteFinancialButton recordId={record.id} />
                           </div>
                         </TableCell>
