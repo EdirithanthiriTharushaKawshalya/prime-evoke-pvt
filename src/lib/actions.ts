@@ -12,7 +12,8 @@ import {
   ProductOrderPhotographerCommission,
   FinancialRecord,
   RentalBooking,
-  RentalEquipment
+  RentalEquipment,
+  RentalTeamCommission
 } from '@/lib/types';
 import { RentalOrderItem } from '@/lib/types';
 
@@ -99,15 +100,42 @@ export async function generateMonthlyReport(month: string, year: string) {
       
     if (ordersError) throw ordersError;
 
-    // --- NEW: Fetch Rental Bookings ---
-    const { data: rentalBookings } = await supabase
+    // --- UPDATED: Fetch Rental Bookings with Financials ---
+    const { data: rentalBookingsRaw } = await supabase
       .from('rental_bookings')
-      .select('*, items:rental_order_items(*)') // Fetch related items
+      .select('*, items:rental_order_items(*)')
       .gte('created_at', startDate)
       .lte('created_at', endDate)
       .order('created_at', { ascending: true });
 
-    // --- NEW: Fetch Financial Records ---
+    let rentalBookings = [];
+    
+    if (rentalBookingsRaw && rentalBookingsRaw.length > 0) {
+       const rentalIds = rentalBookingsRaw.map(r => r.id);
+       
+       // Fetch Financials
+       const { data: rFinancials } = await supabase
+         .from('rental_financial_entries')
+         .select('*')
+         .in('rental_id', rentalIds);
+
+       // Fetch Commissions
+       const { data: rCommissions } = await supabase
+         .from('rental_team_commissions')
+         .select('*')
+         .in('rental_id', rentalIds);
+
+       rentalBookings = rentalBookingsRaw.map(r => {
+          const entry = rFinancials?.find(f => f.rental_id === r.id);
+          const details = rCommissions?.filter(c => c.rental_id === r.id);
+          return {
+             ...r,
+             financial_entry: entry ? { ...entry, team_details: details } : null
+          };
+       });
+    }
+
+    // --- Fetch Financial Records ---
     const { data: financialRecords } = await supabase
       .from('other_financial_records')
       .select('*')
@@ -190,7 +218,7 @@ export async function generateMonthlyReport(month: string, year: string) {
       packages: packages || [],
       teamMembers: teamMembers || [],
       productOrders: productOrdersWithFinancial || [],
-      rentalBookings: (rentalBookings as RentalBooking[]) || [], // Pass Rentals
+      rentalBookings: (rentalBookings as RentalBooking[]) || [], // Pass Rentals with financials
       financialRecords: (financialRecords as FinancialRecord[]) || [], // Pass Financials
       month,
       year
@@ -1466,7 +1494,7 @@ export async function generateMySalaryReport(month: string, year: string) {
       .gte('order.created_at', startDate)
       .lte('order.created_at', endDate);
 
-    // 3. --- NEW: Editing Earnings ---
+    // 3. Editing Earnings
     interface RawEditingEntry {
         editor_expenses: number;
         booking: {
@@ -1492,12 +1520,21 @@ export async function generateMySalaryReport(month: string, year: string) {
       booking: Array.isArray(item.booking) ? item.booking[0] : item.booking
     }));
 
+    // 4. --- NEW: Rental Commissions ---
+    const { data: rentalEarnings } = await supabase
+      .from('rental_team_commissions')
+      .select('*, rental:rental_bookings!inner(booking_id, created_at)')
+      .eq('staff_name', userName)
+      .gte('rental.created_at', startDate)
+      .lte('rental.created_at', endDate);
+
     // Generate Report
     const { generateUserSalaryReport } = await import('@/lib/excelExport');
     const excelBlob = await generateUserSalaryReport({
       bookingEarnings: bookingEarnings || [],
       productEarnings: productEarnings || [],
       editingEarnings: editingEarnings,
+      rentalEarnings: rentalEarnings || [], // Pass rental commissions
       userName,
       month,
       year
@@ -2226,6 +2263,111 @@ export async function updateBookingEditor(
 
   revalidatePath('/admin/bookings');
   return { success: true };
+}
+
+// ---------------------------------------------------------
+// RENTAL ASSIGNMENTS
+// ---------------------------------------------------------
+
+export async function updateRentalAssignments(
+  rentalId: number,
+  newAssignments: string[]
+) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Auth Check
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+  
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  const { error } = await supabase
+    .from('rental_bookings')
+    .update({ assigned_team_members: newAssignments })
+    .eq('id', rentalId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/rentals');
+  return { success: true };
+}
+
+// ---------------------------------------------------------
+// RENTAL FINANCIALS
+// ---------------------------------------------------------
+
+export async function updateRentalFinancials(
+  rentalId: number,
+  financialData: {
+    total_revenue: number;
+    delivery_expenses: number;
+    maintenance_expenses: number;
+    other_expenses: number;
+    profit: number;
+    team_commission_total: number;
+  },
+  teamDetails: RentalTeamCommission[]
+) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Auth Check
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  try {
+    // 1. Upsert Main Financial Entry
+    const { error: mainError } = await supabase
+      .from('rental_financial_entries')
+      .upsert({ 
+        rental_id: rentalId, 
+        ...financialData 
+      }, { onConflict: 'rental_id' });
+
+    if (mainError) throw mainError;
+
+    // 2. Handle Team Commissions (Delete old, Insert new)
+    const { error: deleteError } = await supabase
+      .from('rental_team_commissions')
+      .delete()
+      .eq('rental_id', rentalId);
+
+    if (deleteError) throw deleteError;
+
+    const detailsToInsert = teamDetails
+      .filter(d => d.amount > 0)
+      .map(d => ({
+        rental_id: rentalId,
+        staff_name: d.staff_name,
+        amount: d.amount
+      }));
+
+    if (detailsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('rental_team_commissions')
+        .insert(detailsToInsert);
+      
+      if (insertError) throw insertError;
+    }
+
+    revalidatePath('/admin/rentals');
+    return { success: true };
+
+  } catch (error: any) {
+    return { error: error.message };
+  }
 }
 
 // --- NEW: Get Analytics Data ---

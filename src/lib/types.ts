@@ -251,6 +251,30 @@ export type RentalBooking = {
   items?: RentalOrderItem[]; 
   verification_status?: 'pending' | 'verified' | 'rejected';
   store_id: string; 
+  assigned_team_members?: string[] | null;
+  financial_entry?: RentalFinancialEntry | null;
+};
+
+// 2. Add New Financial Types
+export type RentalTeamCommission = {
+  id: number;
+  created_at: string;
+  rental_id: number;
+  staff_name: string;
+  amount: number;
+};
+
+export type RentalFinancialEntry = {
+  id: number;
+  created_at: string;
+  rental_id: number;
+  total_revenue: number | null;
+  team_commission_total: number | null;
+  delivery_expenses: number | null;
+  maintenance_expenses: number | null;
+  other_expenses: number | null;
+  profit: number | null;
+  team_details?: RentalTeamCommission[];
 };
 
 export type RentalOrderItem = {
