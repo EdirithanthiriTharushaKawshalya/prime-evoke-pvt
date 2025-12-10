@@ -8,13 +8,21 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Calendar, CreditCard, FileText, User } from "lucide-react";
+// Fix 1: Removed unused 'FileText'
+import { ArrowLeft, Calendar, CreditCard, User } from "lucide-react";
 import Link from "next/link";
 import { FinancialRecord } from "@/lib/types";
 import { AddFinancialDialog } from "@/components/ui/AddFinancialDialog";
 import { EditFinancialDialog } from "@/components/ui/EditFinancialDialog";
 import { DeleteFinancialButton } from "@/components/ui/DeleteFinancialButton";
 import { Badge } from "@/components/ui/badge";
+
+// Fix 2: Define an extended type for the join result
+interface FinancialRecordWithStaff extends FinancialRecord {
+  staff_member?: {
+    name: string;
+  } | null;
+}
 
 export default async function FinancialsPage() {
   const cookieStore = await cookies();
@@ -45,10 +53,11 @@ export default async function FinancialsPage() {
   // 2. Fetch Financials (Include joined staff name)
   const { data: records } = await supabase
     .from("other_financial_records")
-    .select("*, staff_member:team_members(name)") // <--- Join
+    .select("*, staff_member:team_members(name)")
     .order("date", { ascending: false });
 
-  const financials = (records as FinancialRecord[]) || [];
+  // Fix 2 applied: Cast to the extended type
+  const financials = (records as FinancialRecordWithStaff[]) || [];
 
   return (
     <div className="relative min-h-screen flex flex-col">
@@ -67,7 +76,7 @@ export default async function FinancialsPage() {
           
           {userRole === 'management' && (
             <div className="w-full sm:w-auto">
-                <AddFinancialDialog staffMembers={staffMembers || []} /> {/* Pass Staff */}
+                <AddFinancialDialog staffMembers={staffMembers || []} />
             </div>
           )}
         </div>
@@ -103,10 +112,11 @@ export default async function FinancialsPage() {
                   </div>
 
                   {/* Staff Name Display */}
-                  {record.staff_id && (record as any).staff_member && (
+                  {/* Fix 2 applied: Removed 'as any' casting */}
+                  {record.staff_id && record.staff_member && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                       <User className="h-3 w-3" />
-                      <span>Paid to: {(record as any).staff_member.name}</span>
+                      <span>Paid to: {record.staff_member.name}</span>
                     </div>
                   )}
 
@@ -170,8 +180,9 @@ export default async function FinancialsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {(record as any).staff_member?.name ? (
-                          <Badge variant="outline" className="text-[10px]">{(record as any).staff_member.name}</Badge>
+                        {/* Fix 2 applied: Removed 'as any' casting */}
+                        {record.staff_member?.name ? (
+                          <Badge variant="outline" className="text-[10px]">{record.staff_member.name}</Badge>
                         ) : "-"}
                       </TableCell>
                       <TableCell>

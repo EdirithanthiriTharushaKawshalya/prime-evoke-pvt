@@ -1,4 +1,4 @@
-// actions.ts - Full updated file
+// actions.ts
 "use server";
 
 import { createServerClient } from '@supabase/ssr';
@@ -15,13 +15,12 @@ import {
   RentalEquipment,
   RentalTeamCommission
 } from '@/lib/types';
-import { RentalOrderItem } from '@/lib/types';
 
-// --- Types for Analytics & Reports ---
-interface DatabaseBooking {
+// --- Types for Analytics & Reports (Locally defined to fix 'any' issues) ---
+
+interface AnalyticsBooking {
   id: number;
   event_date: string | null;
-  package_amount?: number | null; // For old logic fallback
   assigned_photographers: string[] | null;
   assigned_editor: string | null;
   event_type: string | null;
@@ -31,17 +30,28 @@ interface DatabaseBooking {
   } | null;
 }
 
-interface DatabaseRental {
+interface AnalyticsRental {
   id: number;
   start_date: string;
   total_amount: number;
 }
 
-interface DatabaseOrder {
+interface AnalyticsOrder {
   id: number;
   created_at: string;
   total_amount: number;
-  assigned_photographers: string[] | null; // <--- Added this field
+  assigned_photographers: string[] | null;
+}
+
+interface RawEditingEarning {
+  editor_expenses: number;
+  booking: {
+    inquiry_id: string | null;
+    event_date: string | null;
+  } | {
+    inquiry_id: string | null;
+    event_date: string | null;
+  }[]; 
 }
 
 // --- generateMonthlyReport function ---
@@ -564,6 +574,7 @@ export async function updatePhotographerFinancialDetails(
     const detailsToInsert = photographerDetails.filter(detail => detail.amount > 0);
     
     if (detailsToInsert.length > 0) {
+      // Fix: insertError was unused, now we check it.
       const { error: insertError } = await supabase
         .from('photographer_financial_details')
         .insert(detailsToInsert.map(detail => ({
@@ -571,6 +582,10 @@ export async function updatePhotographerFinancialDetails(
           staff_name: detail.staff_name,
           amount: detail.amount
         })));
+        
+      if (insertError) {
+        throw insertError;
+      }
     }
 
     // Revalidate the path to refresh data
@@ -1519,7 +1534,8 @@ export async function generateMySalaryReport(month: string, year: string) {
         .eq('name', userName) // Assuming profile name matches team name
         .single();
 
-    let otherSalaryRecords: any[] = [];
+    // Fix: Explicitly type this as FinancialRecord[]
+    let otherSalaryRecords: FinancialRecord[] = [];
     
     if (teamMember) {
         const { data: records } = await supabase
@@ -1530,24 +1546,31 @@ export async function generateMySalaryReport(month: string, year: string) {
             .gte('date', startDate.split('T')[0])
             .lte('date', endDate.split('T')[0]);
             
-        otherSalaryRecords = records || [];
+        // Explicit cast here is safe because Supabase select('*') matches FinancialRecord structure
+        otherSalaryRecords = (records as FinancialRecord[]) || [];
     }
 
     // Generate Report
     const { generateUserSalaryReport } = await import('@/lib/excelExport');
     
-    // Need to cast raw editing data
-    const editingEarnings = ((editingEarningsRaw as unknown as any[]) || []).map((item: any) => ({
-      editor_expenses: item.editor_expenses,
-      booking: Array.isArray(item.booking) ? item.booking[0] : item.booking
-    }));
+    // Fix: Type the raw editing data using the interface
+    const editingEarnings = ((editingEarningsRaw as unknown as RawEditingEarning[]) || []).map((item) => {
+      const booking = Array.isArray(item.booking) ? item.booking[0] : item.booking;
+      return {
+        editor_expenses: item.editor_expenses,
+        booking: {
+          inquiry_id: booking?.inquiry_id ?? undefined,
+          event_date: booking?.event_date ?? undefined
+        }
+      };
+    });
 
     const excelBlob = await generateUserSalaryReport({
       bookingEarnings: bookingEarnings || [],
       productEarnings: productEarnings || [],
       editingEarnings: editingEarnings,
       rentalEarnings: rentalEarnings || [],
-      otherSalaryRecords, // <--- Pass the new records
+      otherSalaryRecords, 
       userName,
       month,
       year
@@ -1562,9 +1585,10 @@ export async function generateMySalaryReport(month: string, year: string) {
       fileName: `Salary-${userName}-${month}-${year}.xlsx` 
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating salary report:", error);
-    return { error: error.message };
+    const message = error instanceof Error ? error.message : "Failed to generate salary report";
+    return { error: message };
   }
 }
 
@@ -1860,24 +1884,6 @@ export async function updateRentalBookingStatus(id: number, status: string) {
   if (error) return { error: error.message };
   revalidatePath('/admin/rentals');
   return { success: true };
-}
-
-// --- MODIFIED: submitRentalBooking ---
-// Update the interface to accept verification data points
-interface RentalBookingSubmission {
-  clientName: string;
-  clientEmail: string;
-  clientPhone: string;
-  startDate: Date;
-  endDate: Date;
-  storeId: string;
-  items: { equipmentId: string; quantity: number }[];
-  totalCost: number;
-  // NEW FIELDS FOR VERIFICATION
-  clientAddress: string;
-  idFrontPath: string;
-  idBackPath: string;
-  selfiePath: string;
 }
 
 // --- UPDATED: submitRentalBooking ---
@@ -2316,8 +2322,9 @@ export async function updateRentalFinancials(
     revalidatePath('/admin/rentals');
     return { success: true };
 
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to update financials";
+    return { error: message };
   }
 }
 
@@ -2370,6 +2377,11 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
     .gte('created_at', startIso)
     .neq('status', 'Cancelled');
 
+  // Fix: Cast the results to the locally defined types immediately
+  const typedBookings = (bookings as unknown as AnalyticsBooking[]) || [];
+  const typedRentals = (rentals as unknown as AnalyticsRental[]) || [];
+  const typedOrders = (orders as unknown as AnalyticsOrder[]) || [];
+
   // 3. Aggregate Monthly Revenue & Counts
   interface MonthlyData {
     name: string;
@@ -2399,16 +2411,16 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
   };
 
   // Process Bookings
-  (bookings as any[])?.forEach((b) => {
+  typedBookings.forEach((b) => {
     const revenue = b.financial_entry?.final_amount || b.financial_entry?.package_amount || 0;
     processEntry(b.event_date || '', 'bookings', revenue);
   });
 
   // Process Rentals
-  (rentals as any[])?.forEach(r => processEntry(r.start_date, 'rentals', r.total_amount || 0));
+  typedRentals.forEach(r => processEntry(r.start_date, 'rentals', r.total_amount || 0));
   
   // Process Orders
-  (orders as any[])?.forEach(o => processEntry(o.created_at, 'orders', o.total_amount || 0));
+  typedOrders.forEach(o => processEntry(o.created_at, 'orders', o.total_amount || 0));
 
   // Convert to array and sort by date
   const chartData = Object.values(monthlyData).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
@@ -2417,7 +2429,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
   const staffStats: Record<string, { name: string, events: number, edits: number, products: number }> = {};
 
   // Process Events & Edits
-  (bookings as any[])?.forEach((b) => {
+  typedBookings.forEach((b) => {
     if (Array.isArray(b.assigned_photographers)) {
         b.assigned_photographers.forEach((name: string) => {
             if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0, products: 0 };
@@ -2432,7 +2444,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
   });
 
   // Process Products
-  (orders as any[])?.forEach((o) => {
+  typedOrders.forEach((o) => {
     if (Array.isArray(o.assigned_photographers)) {
       o.assigned_photographers.forEach((name: string) => {
         if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0, products: 0 };
@@ -2447,7 +2459,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
 
   // 5. Category Distribution
   const categoryStats: Record<string, number> = {};
-  (bookings as any[])?.forEach((b) => {
+  typedBookings.forEach((b) => {
     const type = b.event_type || 'Other';
     categoryStats[type] = (categoryStats[type] || 0) + 1;
   });

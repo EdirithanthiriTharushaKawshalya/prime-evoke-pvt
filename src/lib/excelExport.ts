@@ -1,7 +1,7 @@
-// lib/excelExport.ts - Full updated file
+// lib/excelExport.ts
 import { 
   Booking, ServicePackage, TeamMember, ProductOrder, 
-  RentalBooking, FinancialRecord // Ensure these are imported
+  RentalBooking, FinancialRecord 
 } from './types';
 
 // --- THIS IS THE FIX ---
@@ -10,11 +10,17 @@ export interface MonthlyReportData {
   packages: ServicePackage[];
   teamMembers: TeamMember[];
   productOrders: ProductOrder[];
-  // Add these two lines to fix the "Object literal..." error in actions.ts
   rentalBookings: RentalBooking[]; 
   financialRecords: FinancialRecord[];
   month: string;
   year: string;
+}
+
+// Fix: Define extended interface for FinancialRecord with joined staff data
+interface FinancialRecordWithStaff extends FinancialRecord {
+  staff_member?: {
+    name: string;
+  } | null;
 }
 
 interface PackageStats {
@@ -72,11 +78,11 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
   // --- NEW SHEETS ---
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateRentalBookingsSheet(rentalBookings)), 
-    'Rental Bookings' // <--- New Sheet
+    'Rental Bookings' 
   );
   XLSX.utils.book_append_sheet(workbook, 
     XLSX.utils.aoa_to_sheet(generateFinancialRecordsSheet(financialRecords)), 
-    'General Ledger' // <--- New Sheet
+    'General Ledger' 
   );
   // ------------------
   
@@ -273,7 +279,8 @@ function generateBookingDetailsSheet(bookings: Booking[], packages: ServicePacka
 function generatePackageAnalyticsSheet(packageStats: PackageStats): (string | number)[][] {
   const headers = ['Package Name', 'Booking Count', 'Total Revenue'];
   const data = Object.entries(packageStats)
-    .filter(([pkgName, stats]) => stats.count > 0) // Only show packages with bookings
+    // Fix: Unused 'pkgName' removed via destructuring skip
+    .filter(([, stats]) => stats.count > 0) 
     .map(([pkgName, stats]) => [
       pkgName,
       stats.count,
@@ -649,7 +656,7 @@ function generateRentalBookingsSheet(rentals: RentalBooking[]): (string | number
 function generateFinancialRecordsSheet(records: FinancialRecord[]): (string | number)[][] {
   const headers = [
     'Date', 'Description', 'Type', 'Category', 
-    'Payment Method', 'Assigned Staff', 'Income Amount', 'Expense Amount' // <--- Added Header
+    'Payment Method', 'Assigned Staff', 'Income Amount', 'Expense Amount' 
   ];
 
   if (!records || records.length === 0) {
@@ -657,15 +664,15 @@ function generateFinancialRecordsSheet(records: FinancialRecord[]): (string | nu
   }
 
   const data = records.map(r => {
-    // Check if staff_member object exists (from the join)
-    const staffName = (r as any).staff_member?.name || '-'; 
+    // Fix: Explicit cast to extended interface
+    const staffName = (r as FinancialRecordWithStaff).staff_member?.name || '-'; 
     return [
       new Date(r.date).toLocaleDateString(),
       r.description,
       r.type,
       r.category,
       r.payment_method || 'N/A',
-      staffName, // <--- Added Field
+      staffName, 
       r.type === 'Income' ? `Rs. ${r.amount.toLocaleString()}` : '',
       r.type === 'Expense' ? `Rs. ${r.amount.toLocaleString()}` : '',
     ]
@@ -693,7 +700,7 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
     'Booking Earnings', 
     'Product Commission', 
     'Rental Commission',
-    'Other Payments', // <--- NEW COLUMN
+    'Other Payments', 
     'Total Earnings'
   ];
   
@@ -702,7 +709,7 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
       bookingEarnings: number; 
       productEarnings: number; 
       rentalEarnings: number;
-      otherEarnings: number; // <--- NEW FIELD
+      otherEarnings: number; 
       totalEarnings: number; 
     } 
   } = {};
@@ -791,8 +798,10 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
   // 4. Add Financial Records Loop for Other Payments
   if (financialRecords) {
     financialRecords.forEach(record => {
-      if (record.type === 'Expense' && (record as any).staff_member?.name) {
-        const staffName = (record as any).staff_member.name;
+      // Fix: Explicit cast to extended interface
+      const recWithStaff = record as FinancialRecordWithStaff;
+      if (recWithStaff.type === 'Expense' && recWithStaff.staff_member?.name) {
+        const staffName = recWithStaff.staff_member.name;
         // Initialize if not exists
         if (!salaryData[staffName]) {
           salaryData[staffName] = { 
@@ -827,7 +836,7 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
       `Rs. ${totals.bookingEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       `Rs. ${totals.productEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       `Rs. ${totals.rentalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      `Rs. ${totals.otherEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, // <--- NEW COLUMN
+      `Rs. ${totals.otherEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
       `Rs. ${totals.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     ])
     .sort((a, b) => {
@@ -851,7 +860,7 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
       `Rs. ${totalBookings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       `Rs. ${totalProducts.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       `Rs. ${totalRentals.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      `Rs. ${totalOther.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, // <--- NEW COLUMN
+      `Rs. ${totalOther.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
       `Rs. ${totalOverall.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     ]
   );
@@ -898,7 +907,7 @@ export interface UserSalaryData {
   productEarnings: ProductEarningItem[];
   editingEarnings: EditingEarningItem[];
   rentalEarnings: RentalEarningItem[];
-  otherSalaryRecords: FinancialRecord[]; // <--- NEW
+  otherSalaryRecords: FinancialRecord[]; 
   userName: string;
   month: string;
   year: string;
@@ -915,7 +924,7 @@ export async function generateUserSalaryReport(data: UserSalaryData): Promise<Bl
   let totalProductEarnings = 0;
   let totalEditingEarnings = 0;
   let totalRentalEarnings = 0;
-  let totalOtherEarnings = 0; // <--- NEW
+  let totalOtherEarnings = 0; 
 
   // 1. Photography Earnings Sheet
   const bookingHeaders = ['Inquiry ID', 'Event Date', 'Amount'];
@@ -1033,7 +1042,7 @@ export async function generateUserSalaryReport(data: UserSalaryData): Promise<Bl
     ['Editing Earnings', `Rs. ${totalEditingEarnings.toLocaleString()}`],
     ['Product Commission', `Rs. ${totalProductEarnings.toLocaleString()}`],
     ['Rental Commission', `Rs. ${totalRentalEarnings.toLocaleString()}`],
-    ['Other Salaries/Payments', `Rs. ${totalOtherEarnings.toLocaleString()}`], // <--- NEW ROW
+    ['Other Salaries/Payments', `Rs. ${totalOtherEarnings.toLocaleString()}`], 
     ['', ''],
     ['GRAND TOTAL', `Rs. ${grandTotal.toLocaleString()}`]
   ];
