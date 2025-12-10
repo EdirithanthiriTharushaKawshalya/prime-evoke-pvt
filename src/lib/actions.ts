@@ -135,10 +135,10 @@ export async function generateMonthlyReport(month: string, year: string) {
        });
     }
 
-    // --- Fetch Financial Records ---
+    // --- UPDATE: Fetch Financial Records with staff data ---
     const { data: financialRecords } = await supabase
       .from('other_financial_records')
-      .select('*')
+      .select('*, staff_member:team_members(name)') // Fetch staff name
       .gte('date', startDate.split('T')[0])
       .lte('date', endDate.split('T')[0])
       .order('date', { ascending: true });
@@ -1495,17 +1495,6 @@ export async function generateMySalaryReport(month: string, year: string) {
       .lte('order.created_at', endDate);
 
     // 3. Editing Earnings
-    interface RawEditingEntry {
-        editor_expenses: number;
-        booking: {
-            inquiry_id: string;
-            event_date: string;
-        } | {
-            inquiry_id: string;
-            event_date: string;
-        }[];
-    }
-
     const { data: editingEarningsRaw } = await supabase
       .from('financial_entries')
       .select('editor_expenses, booking:client_bookings!inner(inquiry_id, event_date)')
@@ -1513,14 +1502,8 @@ export async function generateMySalaryReport(month: string, year: string) {
       .gt('editor_expenses', 0)
       .gte('booking.event_date', startDate.split('T')[0])
       .lte('booking.event_date', endDate.split('T')[0]);
-
-    // Map editingEarnings to correct type (booking should be an object, not array)
-    const editingEarnings = ((editingEarningsRaw as unknown as RawEditingEntry[]) || []).map((item) => ({
-      editor_expenses: item.editor_expenses,
-      booking: Array.isArray(item.booking) ? item.booking[0] : item.booking
-    }));
-
-    // 4. --- NEW: Rental Commissions ---
+      
+    // 4. Rental Commissions (From previous task)
     const { data: rentalEarnings } = await supabase
       .from('rental_team_commissions')
       .select('*, rental:rental_bookings!inner(booking_id, created_at)')
@@ -1528,13 +1511,43 @@ export async function generateMySalaryReport(month: string, year: string) {
       .gte('rental.created_at', startDate)
       .lte('rental.created_at', endDate);
 
+    // 5. --- NEW: Other Financial Records (Allowances/Bonuses) ---
+    // First, find the team_member ID for this user
+    const { data: teamMember } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('name', userName) // Assuming profile name matches team name
+        .single();
+
+    let otherSalaryRecords: any[] = [];
+    
+    if (teamMember) {
+        const { data: records } = await supabase
+            .from('other_financial_records')
+            .select('*')
+            .eq('staff_id', teamMember.id)
+            .eq('type', 'Expense') // Only expenses count as payment to staff
+            .gte('date', startDate.split('T')[0])
+            .lte('date', endDate.split('T')[0]);
+            
+        otherSalaryRecords = records || [];
+    }
+
     // Generate Report
     const { generateUserSalaryReport } = await import('@/lib/excelExport');
+    
+    // Need to cast raw editing data
+    const editingEarnings = ((editingEarningsRaw as unknown as any[]) || []).map((item: any) => ({
+      editor_expenses: item.editor_expenses,
+      booking: Array.isArray(item.booking) ? item.booking[0] : item.booking
+    }));
+
     const excelBlob = await generateUserSalaryReport({
       bookingEarnings: bookingEarnings || [],
       productEarnings: productEarnings || [],
       editingEarnings: editingEarnings,
-      rentalEarnings: rentalEarnings || [], // Pass rental commissions
+      rentalEarnings: rentalEarnings || [],
+      otherSalaryRecords, // <--- Pass the new records
       userName,
       month,
       year
@@ -1549,51 +1562,27 @@ export async function generateMySalaryReport(month: string, year: string) {
       fileName: `Salary-${userName}-${month}-${year}.xlsx` 
     };
 
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "An unexpected error occurred";
+  } catch (error: any) {
     console.error("Error generating salary report:", error);
-    return { error: message };
+    return { error: error.message };
   }
 }
 
-// --- FINANCIAL RECORDS ACTIONS ---
-
-export async function addFinancialRecord(data: Omit<FinancialRecord, 'id' | 'created_at'>) {
+// --- UPDATE: addFinancialRecord ---
+export async function addFinancialRecord(data: Omit<FinancialRecord, 'id' | 'created_at' | 'staff_member'>) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-      },
-    }
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
   );
 
-  // Security Check: Ensure user is authenticated and management
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    console.error("Error fetching session:", sessionError);
-    return { error: sessionError.message };
-  }
+  // ... Auth Checks (Management Only) ...
+  const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { error: "Not authenticated" };
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .single();
-
-  if (profileError) {
-    console.error("Error fetching profile:", profileError);
-    return { error: profileError.message };
-  }
-
-  if (profile?.role !== 'management') {
-    return { error: "Permission denied. Only management can add financial records." };
-  }
+  
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
 
   const { error } = await supabase.from('other_financial_records').insert([data]);
   
@@ -1602,6 +1591,7 @@ export async function addFinancialRecord(data: Omit<FinancialRecord, 'id' | 'cre
   return { success: true };
 }
 
+// --- UPDATE: updateFinancialRecord ---
 export async function updateFinancialRecord(
   id: number,
   data: {
@@ -1611,6 +1601,7 @@ export async function updateFinancialRecord(
     category: string;
     amount: number;
     payment_method: string;
+    staff_id?: number | null; // <--- Accept staff_id
   }
 ) {
   const cookieStore = await cookies();
@@ -1620,56 +1611,16 @@ export async function updateFinancialRecord(
     { cookies: { get: (name) => cookieStore.get(name)?.value } }
   );
 
-  // Security: Management Only
+  // ... Auth Checks ...
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { error: "Not authenticated" };
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .single();
-
-  if (profile?.role !== 'management') {
-    return { error: "Permission denied. Only management can edit records." };
-  }
+  
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
 
   const { error } = await supabase
     .from('other_financial_records')
     .update(data)
-    .eq('id', id);
-  
-  if (error) return { error: error.message };
-  
-  revalidatePath('/admin/financials');
-  return { success: true };
-}
-
-export async function deleteFinancialRecord(id: number) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (name) => cookieStore.get(name)?.value } }
-  );
-
-  // Security: Management Only
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return { error: "Not authenticated" };
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .single();
-
-  if (profile?.role !== 'management') {
-    return { error: "Permission denied. Only management can delete records." };
-  }
-
-  const { error } = await supabase
-    .from('other_financial_records')
-    .delete()
     .eq('id', id);
   
   if (error) return { error: error.message };
@@ -2394,8 +2345,6 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
   const startIso = startDate.toISOString();
 
   // 2. Fetch Data
-  
-  // FIX: Typed the response for better type safety
   const { data: bookings } = await supabase
     .from('client_bookings')
     .select(`
@@ -2417,7 +2366,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
 
   const { data: orders } = await supabase
     .from('product_orders')
-    .select('id, created_at, total_amount, assigned_photographers') // <--- Added assigned_photographers
+    .select('id, created_at, total_amount, assigned_photographers')
     .gte('created_at', startIso)
     .neq('status', 'Cancelled');
 
@@ -2449,32 +2398,32 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
     monthlyData[key].revenue += amount || 0;
   };
 
-  // Process Bookings with proper financial mapping
-  (bookings as unknown as DatabaseBooking[])?.forEach((b) => {
-    // Prefer final_amount, fallback to package_amount, fallback to 0
+  // Process Bookings
+  (bookings as any[])?.forEach((b) => {
     const revenue = b.financial_entry?.final_amount || b.financial_entry?.package_amount || 0;
     processEntry(b.event_date || '', 'bookings', revenue);
   });
 
-  (rentals as DatabaseRental[])?.forEach(r => processEntry(r.start_date, 'rentals', r.total_amount || 0));
-  (orders as DatabaseOrder[])?.forEach(o => processEntry(o.created_at, 'orders', o.total_amount || 0));
+  // Process Rentals
+  (rentals as any[])?.forEach(r => processEntry(r.start_date, 'rentals', r.total_amount || 0));
+  
+  // Process Orders
+  (orders as any[])?.forEach(o => processEntry(o.created_at, 'orders', o.total_amount || 0));
 
   // Convert to array and sort by date
   const chartData = Object.values(monthlyData).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
 
-  // 4. Aggregate Staff Performance (Updated for Products)
+  // 4. Aggregate Staff Performance
   const staffStats: Record<string, { name: string, events: number, edits: number, products: number }> = {};
 
   // Process Events & Edits
-  (bookings as unknown as DatabaseBooking[])?.forEach((b) => {
-    // Count Photographers
+  (bookings as any[])?.forEach((b) => {
     if (Array.isArray(b.assigned_photographers)) {
         b.assigned_photographers.forEach((name: string) => {
             if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0, products: 0 };
             staffStats[name].events += 1;
         });
     }
-    // Count Editor
     if (b.assigned_editor) {
       const name = b.assigned_editor;
       if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0, products: 0 };
@@ -2483,7 +2432,7 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
   });
 
   // Process Products
-  (orders as DatabaseOrder[])?.forEach((o) => {
+  (orders as any[])?.forEach((o) => {
     if (Array.isArray(o.assigned_photographers)) {
       o.assigned_photographers.forEach((name: string) => {
         if (!staffStats[name]) staffStats[name] = { name, events: 0, edits: 0, products: 0 };
@@ -2492,14 +2441,13 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
     }
   });
 
-  // Sort by total activity
   const staffPerformance = Object.values(staffStats).sort((a, b) => 
     (b.events + b.edits + b.products) - (a.events + a.edits + a.products)
   );
 
   // 5. Category Distribution
   const categoryStats: Record<string, number> = {};
-  (bookings as unknown as DatabaseBooking[])?.forEach((b) => {
+  (bookings as any[])?.forEach((b) => {
     const type = b.event_type || 'Other';
     categoryStats[type] = (categoryStats[type] || 0) + 1;
   });
@@ -2517,4 +2465,26 @@ export async function getAnalyticsData(timeRange: '3m' | '6m' | '1y' | 'all') {
       revenue: chartData.reduce((sum, item) => sum + item.revenue, 0)
     }
   };
+}
+
+export async function deleteFinancialRecord(id: number) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+  if (profile?.role !== 'management') return { error: "Permission denied." };
+
+  const { error } = await supabase.from('other_financial_records').delete().eq('id', id);
+  
+  if (error) return { error: error.message };
+  
+  revalidatePath('/admin/financials');
+  return { success: true };
 }

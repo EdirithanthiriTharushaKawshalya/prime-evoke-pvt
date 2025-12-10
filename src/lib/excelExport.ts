@@ -105,7 +105,7 @@ export async function generateMonthlyExcelReport(data: MonthlyReportData): Promi
     'Photographer Earnings'
   );
   XLSX.utils.book_append_sheet(workbook, 
-    XLSX.utils.aoa_to_sheet(generateSalarySheet(bookings, productOrders, rentalBookings)), 
+    XLSX.utils.aoa_to_sheet(generateSalarySheet(bookings, productOrders, rentalBookings, financialRecords)), 
     'Salary Sheet'
   );
 
@@ -645,26 +645,31 @@ function generateRentalBookingsSheet(rentals: RentalBooking[]): (string | number
   return [headers, ...data];
 }
 
-// --- NEW: Generate Financial Records Sheet ---
+// --- UPDATED: Generate Financial Records Sheet with Assigned Staff ---
 function generateFinancialRecordsSheet(records: FinancialRecord[]): (string | number)[][] {
   const headers = [
     'Date', 'Description', 'Type', 'Category', 
-    'Payment Method', 'Income Amount', 'Expense Amount'
+    'Payment Method', 'Assigned Staff', 'Income Amount', 'Expense Amount' // <--- Added Header
   ];
 
   if (!records || records.length === 0) {
     return [['General Ledger'], [''], ['No financial records found for this period.']];
   }
 
-  const data = records.map(r => [
-    new Date(r.date).toLocaleDateString(),
-    r.description,
-    r.type,
-    r.category,
-    r.payment_method || 'N/A',
-    r.type === 'Income' ? `Rs. ${r.amount.toLocaleString()}` : '',
-    r.type === 'Expense' ? `Rs. ${r.amount.toLocaleString()}` : '',
-  ]);
+  const data = records.map(r => {
+    // Check if staff_member object exists (from the join)
+    const staffName = (r as any).staff_member?.name || '-'; 
+    return [
+      new Date(r.date).toLocaleDateString(),
+      r.description,
+      r.type,
+      r.category,
+      r.payment_method || 'N/A',
+      staffName, // <--- Added Field
+      r.type === 'Income' ? `Rs. ${r.amount.toLocaleString()}` : '',
+      r.type === 'Expense' ? `Rs. ${r.amount.toLocaleString()}` : '',
+    ]
+  });
 
   // Calculate Totals
   const totalIncome = records.filter(r => r.type === 'Income').reduce((sum, r) => sum + r.amount, 0);
@@ -673,21 +678,22 @@ function generateFinancialRecordsSheet(records: FinancialRecord[]): (string | nu
 
   data.push(
     [''],
-    ['TOTALS', '', '', '', '', `Rs. ${totalIncome.toLocaleString()}`, `Rs. ${totalExpense.toLocaleString()}`],
+    ['TOTALS', '', '', '', '', '', `Rs. ${totalIncome.toLocaleString()}`, `Rs. ${totalExpense.toLocaleString()}`],
     [''],
-    ['NET CASH FLOW', '', '', '', '', '', `Rs. ${net.toLocaleString()}`]
+    ['NET CASH FLOW', '', '', '', '', '', '', `Rs. ${net.toLocaleString()}`]
   );
 
   return [headers, ...data];
 }
 
-// --- UPDATED: generateSalarySheet function ---
-function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[], rentals: RentalBooking[]): (string | number)[][] {
+// --- UPDATED: generateSalarySheet function with Financial Records ---
+function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[], rentals: RentalBooking[], financialRecords: FinancialRecord[]): (string | number)[][] {
   const headers = [
     'Staff Member', 
     'Booking Earnings', 
     'Product Commission', 
     'Rental Commission',
+    'Other Payments', // <--- NEW COLUMN
     'Total Earnings'
   ];
   
@@ -696,6 +702,7 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
       bookingEarnings: number; 
       productEarnings: number; 
       rentalEarnings: number;
+      otherEarnings: number; // <--- NEW FIELD
       totalEarnings: number; 
     } 
   } = {};
@@ -706,7 +713,15 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
     if (booking.financial_entry?.photographer_details) {
       booking.financial_entry.photographer_details.forEach(detail => {
         const staffName = detail.staff_name;
-        if (!salaryData[staffName]) salaryData[staffName] = { bookingEarnings: 0, productEarnings: 0, rentalEarnings: 0, totalEarnings: 0 };
+        if (!salaryData[staffName]) {
+          salaryData[staffName] = { 
+            bookingEarnings: 0, 
+            productEarnings: 0, 
+            rentalEarnings: 0, 
+            otherEarnings: 0, 
+            totalEarnings: 0 
+          };
+        }
         salaryData[staffName].bookingEarnings += detail.amount;
         salaryData[staffName].totalEarnings += detail.amount;
       });
@@ -718,7 +733,15 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
         const amount = booking.financial_entry.editor_expenses;
         
         if (amount > 0) {
-            if (!salaryData[editorName]) salaryData[editorName] = { bookingEarnings: 0, productEarnings: 0, rentalEarnings: 0, totalEarnings: 0 };
+            if (!salaryData[editorName]) {
+              salaryData[editorName] = { 
+                bookingEarnings: 0, 
+                productEarnings: 0, 
+                rentalEarnings: 0, 
+                otherEarnings: 0, 
+                totalEarnings: 0 
+              };
+            }
             salaryData[editorName].bookingEarnings += amount;
             salaryData[editorName].totalEarnings += amount;
         }
@@ -731,7 +754,13 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
       order.financial_entry.photographer_details.forEach(detail => {
         const staffName = detail.staff_name;
         if (!salaryData[staffName]) {
-          salaryData[staffName] = { bookingEarnings: 0, productEarnings: 0, rentalEarnings: 0, totalEarnings: 0 };
+          salaryData[staffName] = { 
+            bookingEarnings: 0, 
+            productEarnings: 0, 
+            rentalEarnings: 0, 
+            otherEarnings: 0, 
+            totalEarnings: 0 
+          };
         }
         salaryData[staffName].productEarnings += detail.amount;
         salaryData[staffName].totalEarnings += detail.amount;
@@ -745,13 +774,42 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
       rental.financial_entry.team_details.forEach(detail => {
         const staffName = detail.staff_name;
         if (!salaryData[staffName]) {
-          salaryData[staffName] = { bookingEarnings: 0, productEarnings: 0, rentalEarnings: 0, totalEarnings: 0 };
+          salaryData[staffName] = { 
+            bookingEarnings: 0, 
+            productEarnings: 0, 
+            rentalEarnings: 0, 
+            otherEarnings: 0, 
+            totalEarnings: 0 
+          };
         }
         salaryData[staffName].rentalEarnings += detail.amount;
         salaryData[staffName].totalEarnings += detail.amount;
       });
     }
   });
+
+  // 4. Add Financial Records Loop for Other Payments
+  if (financialRecords) {
+    financialRecords.forEach(record => {
+      if (record.type === 'Expense' && (record as any).staff_member?.name) {
+        const staffName = (record as any).staff_member.name;
+        // Initialize if not exists
+        if (!salaryData[staffName]) {
+          salaryData[staffName] = { 
+            bookingEarnings: 0, 
+            productEarnings: 0, 
+            rentalEarnings: 0, 
+            otherEarnings: 0, 
+            totalEarnings: 0 
+          };
+        }
+        
+        // Add to Other Earnings
+        salaryData[staffName].otherEarnings += record.amount;
+        salaryData[staffName].totalEarnings += record.amount;
+      }
+    });
+  }
 
   // If no data, return a message
   if (Object.keys(salaryData).length === 0) {
@@ -769,12 +827,13 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
       `Rs. ${totals.bookingEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       `Rs. ${totals.productEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       `Rs. ${totals.rentalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Rs. ${totals.otherEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, // <--- NEW COLUMN
       `Rs. ${totals.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     ])
     .sort((a, b) => {
-      // Sort by total earnings (column 4) descending
-      const earningsA = parseFloat((a[4] as string).replace(/[^\d.]/g, ''));
-      const earningsB = parseFloat((b[4] as string).replace(/[^\d.]/g, ''));
+      // Sort by total earnings (column 5) descending
+      const earningsA = parseFloat((a[5] as string).replace(/[^\d.]/g, ''));
+      const earningsB = parseFloat((b[5] as string).replace(/[^\d.]/g, ''));
       return earningsB - earningsA;
     });
 
@@ -782,6 +841,7 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
   const totalBookings = Object.values(salaryData).reduce((sum, d) => sum + d.bookingEarnings, 0);
   const totalProducts = Object.values(salaryData).reduce((sum, d) => sum + d.productEarnings, 0);
   const totalRentals = Object.values(salaryData).reduce((sum, d) => sum + d.rentalEarnings, 0);
+  const totalOther = Object.values(salaryData).reduce((sum, d) => sum + d.otherEarnings, 0);
   const totalOverall = Object.values(salaryData).reduce((sum, d) => sum + d.totalEarnings, 0);
   
   data.push(
@@ -791,6 +851,7 @@ function generateSalarySheet(bookings: Booking[], productOrders: ProductOrder[],
       `Rs. ${totalBookings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       `Rs. ${totalProducts.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       `Rs. ${totalRentals.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Rs. ${totalOther.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, // <--- NEW COLUMN
       `Rs. ${totalOverall.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     ]
   );
@@ -831,20 +892,21 @@ interface RentalEarningItem {
   };
 }
 
-// 1. Update UserSalaryData Interface
+// 1. Updated UserSalaryData Interface
 export interface UserSalaryData {
   bookingEarnings: BookingEarningItem[];
   productEarnings: ProductEarningItem[];
   editingEarnings: EditingEarningItem[];
-  rentalEarnings: RentalEarningItem[]; // <--- NEW
+  rentalEarnings: RentalEarningItem[];
+  otherSalaryRecords: FinancialRecord[]; // <--- NEW
   userName: string;
   month: string;
   year: string;
 }
 
-// 2. Update generateUserSalaryReport function
+// 2. Updated generateUserSalaryReport function
 export async function generateUserSalaryReport(data: UserSalaryData): Promise<Blob> {
-  const { bookingEarnings, productEarnings, editingEarnings, rentalEarnings, userName, month, year } = data; // Add rentalEarnings here
+  const { bookingEarnings, productEarnings, editingEarnings, rentalEarnings, otherSalaryRecords, userName, month, year } = data;
 
   const XLSX = await import('xlsx');
   const workbook = XLSX.utils.book_new();
@@ -852,7 +914,8 @@ export async function generateUserSalaryReport(data: UserSalaryData): Promise<Bl
   let totalBookingEarnings = 0;
   let totalProductEarnings = 0;
   let totalEditingEarnings = 0;
-  let totalRentalEarnings = 0; // <--- NEW
+  let totalRentalEarnings = 0;
+  let totalOtherEarnings = 0; // <--- NEW
 
   // 1. Photography Earnings Sheet
   const bookingHeaders = ['Inquiry ID', 'Event Date', 'Amount'];
@@ -917,7 +980,7 @@ export async function generateUserSalaryReport(data: UserSalaryData): Promise<Bl
     'Products'
   );
 
-  // 4. --- NEW: Rental Commissions Sheet ---
+  // 4. Rental Commissions Sheet
   const rentalHeaders = ['Rental ID', 'Date', 'Commission'];
   const rentalData = rentalEarnings.map(item => {
     totalRentalEarnings += item.amount;
@@ -936,9 +999,31 @@ export async function generateUserSalaryReport(data: UserSalaryData): Promise<Bl
     XLSX.utils.aoa_to_sheet([rentalHeaders, ...rentalData]), 
     'Rentals'
   );
+
+  // 5. --- NEW: Other Payments Sheet ---
+  const otherHeaders = ['Date', 'Description', 'Category', 'Amount'];
+  const otherData = otherSalaryRecords.map(item => {
+    totalOtherEarnings += item.amount;
+    return [
+      new Date(item.date).toLocaleDateString(),
+      item.description,
+      item.category,
+      `Rs. ${item.amount.toLocaleString()}`
+    ];
+  });
+
+  if(otherData.length === 0) otherData.push(['No other payments found.']);
+  otherData.push(['', '', '', '']);
+  otherData.push(['Total Other:', '', '', `Rs. ${totalOtherEarnings.toLocaleString()}`]);
+
+  XLSX.utils.book_append_sheet(workbook, 
+    XLSX.utils.aoa_to_sheet([otherHeaders, ...otherData]), 
+    'Other Payments'
+  );
+
+  // 6. Updated Summary Sheet
+  const grandTotal = totalBookingEarnings + totalEditingEarnings + totalProductEarnings + totalRentalEarnings + totalOtherEarnings;
   
-  // 5. Summary Sheet
-  const grandTotal = totalBookingEarnings + totalEditingEarnings + totalProductEarnings + totalRentalEarnings;
   const summaryHeaders = ['Item', 'Amount'];
   const summaryData = [
     ['User:', userName],
@@ -947,7 +1032,8 @@ export async function generateUserSalaryReport(data: UserSalaryData): Promise<Bl
     ['Photography Earnings', `Rs. ${totalBookingEarnings.toLocaleString()}`],
     ['Editing Earnings', `Rs. ${totalEditingEarnings.toLocaleString()}`],
     ['Product Commission', `Rs. ${totalProductEarnings.toLocaleString()}`],
-    ['Rental Commission', `Rs. ${totalRentalEarnings.toLocaleString()}`], // <--- NEW ROW
+    ['Rental Commission', `Rs. ${totalRentalEarnings.toLocaleString()}`],
+    ['Other Salaries/Payments', `Rs. ${totalOtherEarnings.toLocaleString()}`], // <--- NEW ROW
     ['', ''],
     ['GRAND TOTAL', `Rs. ${grandTotal.toLocaleString()}`]
   ];

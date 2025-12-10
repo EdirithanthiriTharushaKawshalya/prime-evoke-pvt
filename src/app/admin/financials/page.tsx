@@ -8,7 +8,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Calendar, CreditCard, FileText } from "lucide-react";
+import { ArrowLeft, Calendar, CreditCard, FileText, User } from "lucide-react";
 import Link from "next/link";
 import { FinancialRecord } from "@/lib/types";
 import { AddFinancialDialog } from "@/components/ui/AddFinancialDialog";
@@ -36,9 +36,16 @@ export default async function FinancialsPage() {
   
   const userRole = profileData?.role || 'staff';
 
+  // 1. Fetch Staff Members for the dropdown
+  const { data: staffMembers } = await supabase
+    .from("team_members")
+    .select("id, name")
+    .order("name");
+
+  // 2. Fetch Financials (Include joined staff name)
   const { data: records } = await supabase
     .from("other_financial_records")
-    .select("*")
+    .select("*, staff_member:team_members(name)") // <--- Join
     .order("date", { ascending: false });
 
   const financials = (records as FinancialRecord[]) || [];
@@ -60,7 +67,7 @@ export default async function FinancialsPage() {
           
           {userRole === 'management' && (
             <div className="w-full sm:w-auto">
-                <AddFinancialDialog />
+                <AddFinancialDialog staffMembers={staffMembers || []} /> {/* Pass Staff */}
             </div>
           )}
         </div>
@@ -94,6 +101,14 @@ export default async function FinancialsPage() {
                   <div>
                     <p className="font-medium text-base">{record.description}</p>
                   </div>
+
+                  {/* Staff Name Display */}
+                  {record.staff_id && (record as any).staff_member && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                      <User className="h-3 w-3" />
+                      <span>Paid to: {(record as any).staff_member.name}</span>
+                    </div>
+                  )}
 
                   {/* Bottom Row: Badges & Payment */}
                   <div className="flex flex-wrap gap-2 items-center justify-between mt-1">
@@ -135,7 +150,8 @@ export default async function FinancialsPage() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-white/10">
                     <TableHead className="w-[120px]">Date</TableHead>
-                    <TableHead className="w-[300px]">Description</TableHead>
+                    <TableHead className="w-[250px]">Description</TableHead>
+                    <TableHead>Staff</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Method</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
@@ -149,9 +165,14 @@ export default async function FinancialsPage() {
                         {new Date(record.date).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <div className="truncate max-w-[300px]" title={record.description}>
+                        <div className="truncate max-w-[250px]" title={record.description}>
                             {record.description}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {(record as any).staff_member?.name ? (
+                          <Badge variant="outline" className="text-[10px]">{(record as any).staff_member.name}</Badge>
+                        ) : "-"}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={`font-normal ${
@@ -179,7 +200,7 @@ export default async function FinancialsPage() {
                   ))}
                   {financials.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={userRole === 'management' ? 6 : 5} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={userRole === 'management' ? 7 : 6} className="text-center py-12 text-muted-foreground">
                         No records found.
                       </TableCell>
                     </TableRow>

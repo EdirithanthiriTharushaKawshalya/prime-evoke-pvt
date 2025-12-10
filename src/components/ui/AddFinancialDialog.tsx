@@ -25,7 +25,11 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { addFinancialRecord } from "@/lib/actions";
 
-export function AddFinancialDialog() {
+interface AddFinancialDialogProps {
+  staffMembers: { id: number; name: string }[]; // <--- Props
+}
+
+export function AddFinancialDialog({ staffMembers }: AddFinancialDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -37,6 +41,7 @@ export function AddFinancialDialog() {
     category: "",
     amount: "",
     payment_method: "Cash",
+    staff_id: "none", // Default
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,6 +56,7 @@ export function AddFinancialDialog() {
         category: formData.category,
         amount: parseFloat(formData.amount),
         payment_method: formData.payment_method,
+        staff_id: formData.staff_id !== "none" ? parseInt(formData.staff_id) : null,
       });
 
       if (result.error) {
@@ -65,6 +71,7 @@ export function AddFinancialDialog() {
           category: "",
           amount: "",
           payment_method: "Cash",
+          staff_id: "none",
         });
         router.refresh();
       }
@@ -168,6 +175,27 @@ export function AddFinancialDialog() {
               </Select>
             </div>
           </div>
+
+          {/* Only show Staff Selector if Type is Expense */}
+          {formData.type === "Expense" && (
+            <div className="space-y-2">
+              <Label>Assign to Staff (Optional)</Label>
+              <Select 
+                value={formData.staff_id} 
+                onValueChange={(val) => setFormData({...formData, staff_id: val})}
+              >
+                <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (General Expense)</SelectItem>
+                  {staffMembers.map(staff => (
+                    <SelectItem key={staff.id} value={staff.id.toString()}>
+                      {staff.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <DialogFooter className="gap-2 sm:gap-0 mt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">

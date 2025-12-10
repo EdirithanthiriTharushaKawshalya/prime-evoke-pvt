@@ -209,6 +209,8 @@ export type FinancialRecord = {
   category: string;
   amount: number;
   payment_method: string | null;
+  staff_id?: number | null; 
+  staff_member?: { name: string } | null; 
 };
 
 // --- NEW Stock Item Type ---
