@@ -19,6 +19,13 @@ export const metadata: Metadata = {
   keywords: ["Photography", "Wedding Photography", "Studio Zine", "Evoke Gallery", "Music Production", "Sri Lanka"],
   authors: [{ name: "Prime Evoke Private Limited" }],
   creator: "Prime Evoke",
+  // --- ADDED ICONS SECTION ---
+  icons: {
+    icon: '/icon.png', // The file in your public folder (192x192 recommended)
+    shortcut: '/favicon.ico',
+    apple: '/apple-icon.png', // Optional: for iPhones (180x180)
+  },
+  // ---------------------------
   // --- UPDATED VERIFICATION ---
   verification: {
     // Paste ONLY the code inside the content="" quotes
