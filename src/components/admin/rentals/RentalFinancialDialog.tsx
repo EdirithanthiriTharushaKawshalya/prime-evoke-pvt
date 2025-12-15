@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation"; // <--- 1. Import useRouter
 import { RentalBooking, RentalTeamCommission } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
@@ -18,10 +19,11 @@ interface Props {
 export function RentalFinancialDialog({ rental }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const router = useRouter(); // <--- 2. Initialize router
   
   const fin = rental.financial_entry;
   
-  // 1. Initialize main form data from props (Persistence)
+  // Initialize main form data from props (Persistence)
   const [formData, setFormData] = useState({
     total_revenue: fin?.total_revenue ?? rental.total_amount ?? 0,
     delivery_expenses: fin?.delivery_expenses || 0,
@@ -31,20 +33,14 @@ export function RentalFinancialDialog({ rental }: Props) {
 
   const [teamCommissions, setTeamCommissions] = useState<RentalTeamCommission[]>([]);
 
-  // 2. Initialize commissions based on assigned team AND saved details
+  // Initialize commissions based on assigned team AND saved details
   useEffect(() => {
     if(open) {
-      // Get saved details from the database (via props)
       const savedDetails = fin?.team_details || [];
-      // Get current team from the assignment list
       const assignedMembers = rental.assigned_team_members || [];
       
-      // Map through currently assigned team
       const combined = assignedMembers.map(name => {
-        // Try to find a saved record for this person
         const found = savedDetails.find(e => e.staff_name === name);
-        
-        // Use saved record OR create a default blank one
         return found || { 
             id: 0, 
             created_at: '', 
@@ -56,7 +52,6 @@ export function RentalFinancialDialog({ rental }: Props) {
       
       setTeamCommissions(combined);
       
-      // Also refresh the main form data in case it changed
       setFormData({
         total_revenue: fin?.total_revenue ?? rental.total_amount ?? 0,
         delivery_expenses: fin?.delivery_expenses || 0,
@@ -84,10 +79,12 @@ export function RentalFinancialDialog({ rental }: Props) {
     );
     setLoading(false);
     
-    if(res.error) toast.error(res.error);
-    else {
+    if(res.error) {
+      toast.error(res.error);
+    } else {
       toast.success("Financials Saved");
       setOpen(false);
+      router.refresh(); // <--- 3. Refresh page to update card total
     }
   };
 

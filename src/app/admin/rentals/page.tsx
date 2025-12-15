@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, MapPin, Users, CheckCircle, Image as ImageIcon } from "lucide-react"; 
 import Link from "next/link";
 import Image from "next/image";
-import { RentalEquipment, RentalBooking } from "@/lib/types";
+import { RentalEquipment, RentalBooking, Profile } from "@/lib/types";
 import { AddEquipmentDialog } from "@/components/ui/AddEquipmentDialog";
 import { Badge } from "@/components/ui/badge";
 import VerificationDialog from "@/components/admin/rentals/VerificationDialog";
@@ -38,7 +38,7 @@ export default async function RentalsAdminPage() {
     .eq("id", session.user.id)
     .single();
   
-  const userRole = profileData?.role || 'staff';
+  const userRole = (profileData as Profile)?.role || 'staff';
   const isManagement = userRole === 'management';
 
   // 1. Fetch Inventory
@@ -156,7 +156,10 @@ export default async function RentalsAdminPage() {
                     
                     <div className="text-right">
                         <p className="text-xs text-muted-foreground">Total</p>
-                        <p className="font-bold text-lg">Rs. {booking.total_amount.toLocaleString()}</p>
+                        {/* --- UPDATED TOTAL LOGIC --- */}
+                        <p className="font-bold text-lg">
+                          Rs. {(booking.financial_entry?.total_revenue ?? booking.total_amount).toLocaleString()}
+                        </p>
                     </div>
                   </div>
                 </CardHeader>
