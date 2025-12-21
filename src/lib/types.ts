@@ -286,3 +286,30 @@ export type RentalOrderItem = {
   days_rented: number;
   daily_rate_snapshot: number;
 };
+
+export type BoothEvent = {
+  id: number;
+  created_at: string;
+  name: string;
+  event_date: string;
+  is_active: boolean;
+};
+
+export type BoothItem = {
+  id: number;
+  created_at: string;
+  event_id: number;
+  name: string;
+  description: string | null;
+};
+
+export type BoothOrder = {
+  id: number;
+  created_at: string;
+  event_id: number;
+  item_id: number | null; // If null, it's 'Other'
+  client_name: string;
+  phone_number: string | null;
+  photo_ids: string[]; // Array of strings
+  status: 'Pending' | 'Printed' | 'Delivered' | 'Cancelled';
+};

@@ -13,7 +13,10 @@ import {
   FinancialRecord,
   RentalBooking,
   RentalEquipment,
-  RentalTeamCommission
+  RentalTeamCommission,
+  BoothEvent,
+  BoothItem,
+  BoothOrder
 } from '@/lib/types';
 
 // --- Types for Analytics & Reports (Locally defined to fix 'any' issues) ---
@@ -52,6 +55,23 @@ interface RawEditingEarning {
     inquiry_id: string | null;
     event_date: string | null;
   }[]; 
+}
+
+// --- Helper function to create Supabase client ---
+async function createClient() {
+  const cookieStore = await cookies();
+  
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
 }
 
 // --- generateMonthlyReport function ---
@@ -2498,5 +2518,72 @@ export async function deleteFinancialRecord(id: number) {
   if (error) return { error: error.message };
   
   revalidatePath('/admin/financials');
+  return { success: true };
+}
+
+// --- PHOTO BOOTH ACTIONS ---
+
+// 1. Create Event
+export async function createBoothEvent(name: string, date: string) {
+  const supabase = await createClient(); // Use your existing helper
+  const { error } = await supabase.from('booth_events').insert([{ name, event_date: date }]);
+  if (error) return { error: error.message };
+  revalidatePath('/booth');
+  return { success: true };
+}
+
+// 2. Create Item (e.g., Dance Group)
+export async function createBoothItem(eventId: number, name: string, description: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('booth_items').insert([{ event_id: eventId, name, description }]);
+  if (error) return { error: error.message };
+  revalidatePath(`/booth/${eventId}`);
+  return { success: true };
+}
+
+// 3. Add Order (Works for both Item and Other)
+export async function addBoothOrder(data: {
+  event_id: number;
+  item_id: number | null;
+  client_name: string;
+  phone_number?: string;
+  photo_ids: string[];
+}) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('booth_orders').insert([data]);
+  if (error) return { error: error.message };
+  
+  // Revalidate specific path based on where we came from
+  const path = data.item_id 
+    ? `/booth/${data.event_id}/item/${data.item_id}` 
+    : `/booth/${data.event_id}/other`;
+  revalidatePath(path);
+  return { success: true };
+}
+
+// 4. Update Order Status
+export async function updateBoothOrderStatus(orderId: number, status: string, path: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('booth_orders').update({ status }).eq('id', orderId);
+  if (error) return { error: error.message };
+  revalidatePath(path);
+  return { success: true };
+}
+
+// 5. Update Order Details
+export async function updateBoothOrder(orderId: number, updates: any, path: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('booth_orders').update(updates).eq('id', orderId);
+  if (error) return { error: error.message };
+  revalidatePath(path);
+  return { success: true };
+}
+
+// 6. Delete Order
+export async function deleteBoothOrder(orderId: number, path: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('booth_orders').delete().eq('id', orderId);
+  if (error) return { error: error.message };
+  revalidatePath(path);
   return { success: true };
 }
