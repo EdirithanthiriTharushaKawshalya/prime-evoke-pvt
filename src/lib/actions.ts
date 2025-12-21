@@ -2587,3 +2587,33 @@ export async function deleteBoothOrder(orderId: number, path: string) {
   revalidatePath(path);
   return { success: true };
 }
+
+// --- NEW ACTIONS FOR DELETION ---
+
+export async function deleteBoothEvent(eventId: number) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  const { error } = await supabase.from('booth_events').delete().eq('id', eventId);
+  if (error) return { error: error.message };
+  revalidatePath('/booth');
+  return { success: true };
+}
+
+export async function deleteBoothItem(itemId: number, eventId: number) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  const { error } = await supabase.from('booth_items').delete().eq('id', itemId);
+  if (error) return { error: error.message };
+  revalidatePath(`/booth/${eventId}`);
+  return { success: true };
+}

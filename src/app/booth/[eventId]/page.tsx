@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Printer, Users } from "lucide-react";
 import { CreateItemDialog } from "@/components/booth/CreateItemDialog";
+import { DeleteItemButton } from "@/components/booth/DeleteButtons"; // <--- Import
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -68,10 +69,16 @@ export default async function EventDashboard({ params }: { params: { eventId: st
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {items?.map((item) => (
               <Link key={item.id} href={`/booth/${eventId}/item/${item.id}`}>
-                <Card className="bg-card/50 border-white/10 hover:border-white/30 hover:bg-white/5 transition-all h-full backdrop-blur-sm active:scale-[0.98]">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base md:text-lg">{item.name}</CardTitle>
-                    {item.description && <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">{item.description}</p>}
+                <Card className="bg-card/50 border-white/10 hover:border-white/30 hover:bg-white/5 transition-all h-full backdrop-blur-sm group">
+                  <CardHeader className="pb-2 flex flex-row justify-between items-start">
+                    <div className="flex-1">
+                      <CardTitle className="text-base md:text-lg">{item.name}</CardTitle>
+                      {item.description && <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">{item.description}</p>}
+                    </div>
+                    {/* Add Delete Button */}
+                    <div className="-mt-1 -mr-2">
+                        <DeleteItemButton itemId={item.id} eventId={parseInt(eventId)} />
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center text-xs md:text-sm text-muted-foreground/70">

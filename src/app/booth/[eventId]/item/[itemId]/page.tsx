@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { OrderTable } from "@/components/booth/OrderTable";
+import { AddBoothOrderDialog } from "@/components/booth/AddBoothOrderDialog"; // Import new dialog
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -31,13 +32,24 @@ export default async function ItemPage({ params }: { params: { eventId: string; 
 
       <main className="flex-1 container mx-auto py-10 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-4 mb-6">
-            <Link href={`/booth/${eventId}`}>
-              <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold">{item?.name}</h1>
-              <p className="text-muted-foreground text-sm">{item?.description || "Manage print orders for this item"}</p>
+          
+          {/* HEADER ROW - Flexbox ensures horizontal alignment */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            
+            {/* Left Side: Back + Title */}
+            <div className="flex items-center gap-4">
+              <Link href={`/booth/${eventId}`}>
+                <Button variant="ghost" size="icon" className="h-10 w-10"><ArrowLeft className="h-5 w-5" /></Button>
+              </Link>
+              <div>
+                <h1 className="text-2xl font-bold">{item?.name}</h1>
+                <p className="text-muted-foreground text-sm">{item?.description || "Manage print orders for this item"}</p>
+              </div>
+            </div>
+
+            {/* Right Side: Add Button */}
+            <div className="w-full md:w-auto">
+              <AddBoothOrderDialog eventId={parseInt(eventId)} itemId={parseInt(itemId)} isOtherCategory={false} />
             </div>
           </div>
 
