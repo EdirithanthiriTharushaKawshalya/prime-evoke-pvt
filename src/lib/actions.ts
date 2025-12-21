@@ -2617,3 +2617,107 @@ export async function deleteBoothItem(itemId: number, eventId: number) {
   revalidatePath(`/booth/${eventId}`);
   return { success: true };
 }
+
+// --- PUBLIC PHOTO EVENT ACTIONS ---
+
+export async function createPublicEvent(formData: any) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  // Generate a simple slug from the title (e.g., "John & Jane Wedding" -> "john-jane-wedding")
+  const slug = formData.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+
+  const { error } = await supabase.from('public_photo_events').insert([{
+    title: formData.title,
+    slug: slug,
+    event_date: formData.date,
+    drive_link: formData.driveLink,
+    facebook_album_link: formData.facebookLink,
+    description: formData.description,
+    cover_image_url: formData.coverImage || null 
+  }]);
+
+  if (error) return { error: error.message };
+  revalidatePath('/photos'); // We will build this page next
+  return { success: true };
+}
+
+export async function getPublicEvents() {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  const { data } = await supabase
+    .from('public_photo_events')
+    .select('*')
+    .order('event_date', { ascending: false });
+    
+  return data || [];
+}
+
+export async function getPublicEventBySlug(slug: string) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  const { data } = await supabase
+    .from('public_photo_events')
+    .select('*')
+    .eq('slug', slug)
+    .single();
+    
+  return data;
+}
+
+export async function deletePublicEvent(id: number) {
+   // ... Add standard delete logic with auth check similar to other delete actions ...
+   const cookieStore = await cookies();
+   const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+   );
+   const { error } = await supabase.from('public_photo_events').delete().eq('id', id);
+   if(error) return { error: error.message };
+   revalidatePath('/photos');
+   return { success: true };
+}
+
+export async function updatePublicEvent(id: number, data: any) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  );
+
+  const { error } = await supabase
+    .from('public_photo_events')
+    .update({
+      title: data.title,
+      event_date: data.date,
+      description: data.description,
+      drive_link: data.driveLink,
+      facebook_album_link: data.facebookLink,
+      cover_image_url: data.coverImage // Update image URL
+    })
+    .eq('id', id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/photos');
+  revalidatePath(`/photos/${data.slug}`); // Also revalidate the specific event page
+  return { success: true };
+}

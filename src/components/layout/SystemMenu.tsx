@@ -1,7 +1,8 @@
+// components/layout/SystemMenu.tsx
 "use client";
 
 import Link from "next/link";
-import { Settings, Lock, Printer } from "lucide-react";
+import { Settings, Lock, Printer, Image } from "lucide-react"; // Added Image icon
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +43,13 @@ export function SystemMenu() {
           </Link>
         </DropdownMenuItem>
 
-        {/* Future links can be added here easily */}
+        {/* Public Gallery Link */}
+        <DropdownMenuItem asChild className="focus:bg-zinc-900 focus:text-white cursor-pointer">
+          <Link href="/photos" className="flex items-center gap-2 w-full">
+            <Image className="h-4 w-4" />
+            <span>Event Gallery</span>
+          </Link>
+        </DropdownMenuItem>
         
       </DropdownMenuContent>
     </DropdownMenu>

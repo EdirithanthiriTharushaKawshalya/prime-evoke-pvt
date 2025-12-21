@@ -7,7 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
-  CalendarDays, DollarSign, Package, ArrowRight, Camera, TrendingUp, MoreVertical 
+  CalendarDays, DollarSign, Package, ArrowRight, Camera, TrendingUp, MoreVertical, Image as ImageIcon 
 } from "lucide-react";
 import Link from "next/link";
 import { LogoutButton } from "@/components/ui/LogoutButton";
@@ -101,7 +101,16 @@ export default async function AdminHub() {
       href: "/admin/analytics",
       color: "text-cyan-500",
       bgColor: "bg-cyan-500/10",
-      restricted: false, // <--- CHANGED FROM TRUE TO FALSE
+      restricted: false, 
+    },
+    {
+      title: "Gallery Manager",
+      description: "Manage public event photos, links, and cover images.",
+      icon: ImageIcon,
+      href: "/admin/photos",
+      color: "text-rose-500",
+      bgColor: "bg-rose-500/10",
+      restricted: true, // Only visible to management
     },
   ];
 
@@ -145,9 +154,6 @@ export default async function AdminHub() {
                 <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/10" />
                 
-                {/* We use a custom class trick here: [&_button]:w-full 
-                   This forces the imported buttons (which we can't easily edit) to stretch full width inside the dropdown.
-                */}
                 <div className="flex flex-col gap-2 [&_button]:w-full [&_button]:justify-start">
                   <MySalaryDownloadButton />
                   {userRole === 'management' && <ReportDownloadButton userRole={userRole} />}
