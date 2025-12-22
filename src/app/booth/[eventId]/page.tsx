@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Printer, Users } from "lucide-react";
 import { CreateItemDialog } from "@/components/booth/CreateItemDialog";
-import { DeleteItemButton } from "@/components/booth/DeleteButtons"; 
+import { DeleteItemButton, DeleteEventButton } from "@/components/booth/DeleteButtons"; 
+import { BoothLogoutButton } from "@/components/booth/BoothLogoutButton"; // New Import
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -16,7 +17,7 @@ export default async function EventDashboard({ params }: { params: { eventId: st
   
   // 1. Check Access Level
   const accessLevel = await getBoothAccess(parseInt(eventId));
-  const isReadOnly = accessLevel === 'client'; // True if entered client code (0000)
+  const isReadOnly = accessLevel === 'client'; 
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -36,15 +37,28 @@ export default async function EventDashboard({ params }: { params: { eventId: st
       <main className="flex-1 container mx-auto py-6 px-4 md:py-10">
         <div className="max-w-6xl mx-auto">
           {/* Nav Header */}
-          <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
-            <Link href="/booth">
-              <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10">
-                <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold leading-tight">{event?.name}</h1>
-              <p className="text-xs md:text-sm text-muted-foreground">Event Dashboard {isReadOnly && "(View Only)"}</p>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
+            <div className="flex items-center gap-3 md:gap-4">
+              <Link href="/booth">
+                <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10">
+                  <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold leading-tight">{event?.name}</h1>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                    {isReadOnly ? "Viewer Mode" : "Admin Mode"}
+                </p>
+              </div>
+            </div>
+
+            {/* HEADER ACTIONS: Logout & (Admin Only) Delete Event */}
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+               <BoothLogoutButton eventId={parseInt(eventId)} />
+               
+               {!isReadOnly && (
+                 <DeleteEventButton eventId={parseInt(eventId)} />
+               )}
             </div>
           </div>
 
@@ -67,7 +81,6 @@ export default async function EventDashboard({ params }: { params: { eventId: st
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 md:mb-6 gap-4">
             <h2 className="text-lg md:text-xl font-semibold">Event Items</h2>
             
-            {/* HIDE CREATE BUTTON IF READ ONLY */}
             {!isReadOnly && (
                 <div className="w-full sm:w-auto">
                 <CreateItemDialog eventId={parseInt(eventId)} />
@@ -86,7 +99,6 @@ export default async function EventDashboard({ params }: { params: { eventId: st
                       {item.description && <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">{item.description}</p>}
                     </div>
                     
-                    {/* HIDE DELETE BUTTON IF READ ONLY */}
                     {!isReadOnly && (
                         <div className="-mt-1 -mr-2">
                             <DeleteItemButton itemId={item.id} eventId={parseInt(eventId)} />
