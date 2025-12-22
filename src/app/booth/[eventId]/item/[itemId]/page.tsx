@@ -10,7 +10,11 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { getBoothAccess } from "@/lib/booth-auth";
 
-export default async function ItemPage({ params }: { params: { eventId: string; itemId: string } }) {
+export default async function ItemPage({ 
+  params 
+}: { 
+  params: Promise<{ eventId: string; itemId: string }> // <--- UPDATED TYPE
+}) {
   const { eventId, itemId } = await params;
   
   // 1. Check Access

@@ -5,14 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Printer, Users } from "lucide-react";
 import { CreateItemDialog } from "@/components/booth/CreateItemDialog";
-import { DeleteItemButton, DeleteEventButton } from "@/components/booth/DeleteButtons"; 
-import { BoothLogoutButton } from "@/components/booth/BoothLogoutButton"; // New Import
+import { DeleteItemButton, DeleteEventButton } from "@/components/booth/DeleteButtons";
+import { BoothLogoutButton } from "@/components/booth/BoothLogoutButton";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { getBoothAccess } from "@/lib/booth-auth";
 
-export default async function EventDashboard({ params }: { params: { eventId: string } }) {
+export default async function EventDashboard({ 
+  params 
+}: { 
+  params: Promise<{ eventId: string }> // <--- UPDATED TYPE
+}) {
   const { eventId } = await params;
   
   // 1. Check Access Level

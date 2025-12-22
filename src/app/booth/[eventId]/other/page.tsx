@@ -10,7 +10,11 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { getBoothAccess } from "@/lib/booth-auth";
 
-export default async function OtherPrintsPage({ params }: { params: { eventId: string } }) {
+export default async function OtherPrintsPage({ 
+  params 
+}: { 
+  params: Promise<{ eventId: string }> // <--- UPDATED TYPE
+}) {
   const { eventId } = await params;
 
   // 1. Check Access

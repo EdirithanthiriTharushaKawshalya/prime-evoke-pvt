@@ -7,18 +7,15 @@ export default async function EventLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { eventId: string };
+  params: Promise<{ eventId: string }>; // <--- UPDATED TYPE (Added Promise)
 }) {
-  const { eventId } = await params;
+  const { eventId } = await params; // This await is correct, now the type matches
   
-  // Check if user has entered a valid code
   const accessLevel = await getBoothAccess(parseInt(eventId));
 
-  // If no access, show Login Screen instead of the page
   if (!accessLevel) {
     return <BoothLoginForm eventId={parseInt(eventId)} />;
   }
 
-  // If valid, show the page content
   return <>{children}</>;
 }
