@@ -5,13 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Printer, Users } from "lucide-react";
 import { CreateItemDialog } from "@/components/booth/CreateItemDialog";
-import { DeleteItemButton } from "@/components/booth/DeleteButtons"; // <--- Import
+import { DeleteItemButton } from "@/components/booth/DeleteButtons"; 
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { getBoothAccess } from "@/lib/booth-auth";
 
 export default async function EventDashboard({ params }: { params: { eventId: string } }) {
   const { eventId } = await params;
+  
+  // 1. Check Access Level
+  const accessLevel = await getBoothAccess(parseInt(eventId));
+  const isReadOnly = accessLevel === 'client'; // True if entered client code (0000)
+
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,7 +44,7 @@ export default async function EventDashboard({ params }: { params: { eventId: st
             </Link>
             <div>
               <h1 className="text-xl md:text-2xl font-bold leading-tight">{event?.name}</h1>
-              <p className="text-xs md:text-sm text-muted-foreground">Event Dashboard</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Event Dashboard {isReadOnly && "(View Only)"}</p>
             </div>
           </div>
 
@@ -60,25 +66,32 @@ export default async function EventDashboard({ params }: { params: { eventId: st
           {/* Items Section Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 md:mb-6 gap-4">
             <h2 className="text-lg md:text-xl font-semibold">Event Items</h2>
-            <div className="w-full sm:w-auto">
-              <CreateItemDialog eventId={parseInt(eventId)} />
-            </div>
+            
+            {/* HIDE CREATE BUTTON IF READ ONLY */}
+            {!isReadOnly && (
+                <div className="w-full sm:w-auto">
+                <CreateItemDialog eventId={parseInt(eventId)} />
+                </div>
+            )}
           </div>
 
           {/* Items Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {items?.map((item) => (
               <Link key={item.id} href={`/booth/${eventId}/item/${item.id}`}>
-                <Card className="bg-card/50 border-white/10 hover:border-white/30 hover:bg-white/5 transition-all h-full backdrop-blur-sm group">
+                <Card className="bg-card/50 border-white/10 hover:border-white/30 hover:bg-white/5 transition-all h-full backdrop-blur-sm active:scale-[0.98] group">
                   <CardHeader className="pb-2 flex flex-row justify-between items-start">
                     <div className="flex-1">
                       <CardTitle className="text-base md:text-lg">{item.name}</CardTitle>
                       {item.description && <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">{item.description}</p>}
                     </div>
-                    {/* Add Delete Button */}
-                    <div className="-mt-1 -mr-2">
-                        <DeleteItemButton itemId={item.id} eventId={parseInt(eventId)} />
-                    </div>
+                    
+                    {/* HIDE DELETE BUTTON IF READ ONLY */}
+                    {!isReadOnly && (
+                        <div className="-mt-1 -mr-2">
+                            <DeleteItemButton itemId={item.id} eventId={parseInt(eventId)} />
+                        </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center text-xs md:text-sm text-muted-foreground/70">
@@ -90,7 +103,7 @@ export default async function EventDashboard({ params }: { params: { eventId: st
             ))}
             {items?.length === 0 && (
                 <div className="col-span-full py-12 text-center text-muted-foreground border border-dashed border-white/10 rounded-lg text-sm">
-                    No items added yet. Add dance groups or segments above.
+                    No items added yet.
                 </div>
             )}
           </div>
